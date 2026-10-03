@@ -1,0 +1,11 @@
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+
+# Prompt evaluation output (may contain model replies with book text)
+eval/out/
+
+# macOS
+.DS_Store
+._*
