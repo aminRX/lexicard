@@ -32,15 +32,61 @@ function Ipa.lookup(path, word)
     return found
 end
 
--- "/ipa ipa/" when every word of the headword has exactly one pronunciation, else nil.
-function Ipa.for_headword(path, headword)
-    local parts = {}
-    for word in (headword or ""):lower():gmatch("%S+") do
-        local variants = Ipa.lookup(path, word)
-        if not variants or #variants ~= 1 then return nil end
-        parts[#parts + 1] = variants[1]
+local function chars(s)
+    local list = {}
+    for ch in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do list[#list + 1] = ch end
+    return list
+end
+
+-- Edit distance between two UTF-8 strings, counted in characters.
+function Ipa.distance(a, b)
+    local x, y = chars(a), chars(b)
+    local prev = {}
+    for j = 0, #y do prev[j] = j end
+    for i = 1, #x do
+        local cur = { [0] = i }
+        for j = 1, #y do
+            local cost = x[i] == y[j] and 0 or 1
+            cur[j] = math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        end
+        prev = cur
     end
-    if #parts == 0 then return nil end
+    return prev[#y]
+end
+
+-- Drops slashes, stress and length marks, and maps ɹ to r, so variants compare by sound.
+local function normalize(ipa)
+    return (ipa:gsub("/", ""):gsub("ˈ", ""):gsub("ˌ", ""):gsub("ː", ""):gsub("%.", ""):gsub("ɹ", "r"))
+end
+
+--[[
+"/ipa ipa/" for the headword from the dictionary, or nil if a word is missing.
+When a word has several pronunciations, `hint` (Gemini's IPA) picks the closest;
+without a hint an ambiguous word gives nil.
+]]
+function Ipa.for_headword(path, headword, hint)
+    local words = {}
+    for word in (headword or ""):lower():gmatch("%S+") do words[#words + 1] = word end
+    if #words == 0 then return nil end
+    local guess = normalize(hint or "")
+    local guess_parts = {}
+    for part in guess:gmatch("%S+") do guess_parts[#guess_parts + 1] = part end
+    local parts = {}
+    for i, word in ipairs(words) do
+        local variants = Ipa.lookup(path, word)
+        if not variants then return nil end
+        local choice = variants[1]
+        if #variants > 1 then
+            if guess == "" then return nil end
+            local target = #guess_parts == #words and guess_parts[i] or guess
+            local best
+            for _, variant in ipairs(variants) do
+                local d = Ipa.distance(normalize(variant), target)
+                if not best or d < best then best, choice = d, variant end
+            end
+        end
+        parts[#parts + 1] = choice
+    end
     return "/" .. table.concat(parts, " ") .. "/"
 end
 

@@ -39,7 +39,7 @@ if not result.ok then
     os.exit(1)
 end
 local card = result.card
-card.ipa = Ipa.for_headword("lexicard.koplugin/data/cmudict-ipa.tsv", card.headword) or card.ipa
+card.ipa = Ipa.for_headword("lexicard.koplugin/data/cmudict-ipa.tsv", card.headword, card.ipa) or card.ipa
 print("model: " .. result.model)
 print(Note.preview_text(card, input, cfg.anki_deck))
 if send then

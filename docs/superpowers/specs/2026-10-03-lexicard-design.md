@@ -186,7 +186,7 @@ Keys are ordered so the model reasons in the right sequence: what was written, t
 
 - A build step on the Mac converts CMUdict's ARPAbet entries into General American IPA, placing stress marks at the start of the stressed syllable (maximal-onset rule). It writes a sorted `word<TAB>ipa1|ipa2` file of about 3.5 MB to `lexicard.koplugin/data/`.
 - On the Kindle, `lexicard_ipa.lua` binary-searches that file instead of loading it into memory.
-- If every word of the headword has exactly one entry, the card uses the dictionary IPA, words joined by spaces, with no stress mark on one-syllable words. Otherwise (heteronyms like *record*, unknown words, names) it keeps Gemini's IPA.
+- If every word of the headword is in the dictionary, the card uses the dictionary IPA, words joined by spaces, with no stress mark on one-syllable words. When a word has several pronunciations (*record*, *of*), the one closest to Gemini's IPA wins, so the sense still decides and a garbled guess is still replaced. Unknown words and names keep Gemini's IPA.
 
 ## 7. The Anki note type "Lexicard"
 

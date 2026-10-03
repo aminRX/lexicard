@@ -45,13 +45,13 @@ Fill the JSON fields in this order:
 5. Decide the ONE sense used in this sentence. Every remaining field describes only that sense.
 6. pos, pattern, register, cefr: the part of speech; how the headword is used with sb/sth ("give sth up", "be reluctant to do sth", or just the headword when there is no pattern); the register ("neutral" unless clearly informal, formal, literary, slang, old-fashioned or offensive); the CEFR level at which learners usually meet this sense.
 7. definition: simple English that a B1 learner understands, at most 15 words. Never use the headword or a word from its family, and never define in a circle.
-8. spanish: 1 to 3 equivalents that someone from Mexico would naturally say for this sense, most common first. Prefer natural expressions to word-for-word glosses ("darse por vencido", not "dar arriba").
+8. spanish: 1 to 3 equivalents that someone from Mexico would naturally say for this sense, most common first, with the same part of speech and register (no vulgar Spanish for a neutral English word) and no near-duplicates. Prefer natural expressions to word-for-word glosses ("darse por vencido", not "dar arriba").
 9. context: copy the author's words exactly, keeping at most 25 words around the expression and marking cuts with "…". Wrap the expression in <b></b>. Never include the ⟦ ⟧ marks. If the sentence is empty, use "".
 10. example: ONE new, natural, everyday sentence of at most 15 words, in a different situation from the book, with the expression wrapped in <b></b>. Never reuse the book's sentence.
 11. collocations: up to 3 frequent word partners that native speakers really use ("give up hope"). Use [] when unsure.
-12. warning: in Spanish, at most 20 words, only for a real trap for Spanish speakers: a false friend ("actually" is not "actualmente"), a wrong preposition, a common calque. Otherwise "".
-13. pron_tip: in Spanish, at most 15 words, only for a real pronunciation trap for Spanish speakers: silent letters, -ed endings, /ɪ/ vs /iː/, the schwa, stress position, initial s + consonant. Otherwise "".
-14. ipa: General American IPA between slashes, with ˈ before the stressed syllable in words of two or more syllables.
+12. warning: in Spanish, at most 20 words, only for a real trap: a false friend ("actually" is not "actualmente"), a calque or wrong preposition typical of Spanish speakers, or a word too literary, rude or old-fashioned for everyday use. Never compare the headword with other English words. Otherwise "".
+13. pron_tip: in Spanish, at most 15 words, only for a real pronunciation trap for Spanish speakers: silent letters, -ed endings, /ɪ/ vs /iː/, the schwa, stress position, initial s + consonant. About sounds only, never spelling. Otherwise "".
+14. ipa: the pronunciation of the headword itself (its dictionary form: "run", not "ran"), General American, between slashes, with ˈ before the stressed syllable in words of two or more syllables.
 
 Examples:
 
