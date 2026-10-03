@@ -234,9 +234,9 @@ On the first successful connection, Lexicard creates the deck and the note type 
 
 ## 10. Development workflow
 
-- **Device access:** copy the Mac's SSH public key over USB to `koreader/settings/SSH/authorized_keys` once. After that, start KOReader's built-in SSH server (Settings → Network → SSH server; port 2222; key login only) and work over Wi-Fi.
-- `scripts/deploy.sh` copies `lexicard.koplugin/` and `.env` to the Kindle over SSH, or to `/Volumes/Kindle` when it's mounted by USB, without macOS `._*` files.
-- `scripts/logs.sh` follows KOReader's `crash.log` over SSH, filtered to Lexicard.
+- **Device access is by USB** (the user's choice). The test loop: deploy while the Kindle is mounted, eject it, restart KOReader, test on the Kindle with Wi-Fi on, and plug it back in to read the log if something fails. SSH (KOReader's built-in server) remains an option later, not a requirement.
+- `scripts/deploy.sh` copies `lexicard.koplugin/` and `.env` to `/Volumes/Kindle/koreader/plugins/`, without macOS `._*` files.
+- `scripts/logs.sh` prints the Lexicard lines from `/Volumes/Kindle/koreader/crash.log`.
 - `scripts/build-ipa-dict.lua` regenerates `data/cmudict-ipa.tsv` from CMUdict.
 - `scripts/try-card.lua` runs the real prompt against Gemini from the Mac and prints the card. With `--send`, it adds the card to a scratch deck through the Mac's AnkiConnect.
 
