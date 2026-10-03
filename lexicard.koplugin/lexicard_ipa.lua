@@ -54,9 +54,11 @@ function Ipa.distance(a, b)
     return prev[#y]
 end
 
--- Drops slashes, stress and length marks, and maps ɹ to r, so variants compare by sound.
+-- Drops slashes, stress and length marks and unifies spellings of the same sound
+-- (ɹ/r, ɚ/ər, ɝ/ɜr, ɡ/g), so variants compare by sound.
 local function normalize(ipa)
-    return (ipa:gsub("/", ""):gsub("ˈ", ""):gsub("ˌ", ""):gsub("ː", ""):gsub("%.", ""):gsub("ɹ", "r"))
+    return (ipa:gsub("/", ""):gsub("ˈ", ""):gsub("ˌ", ""):gsub("ː", ""):gsub("%.", "")
+        :gsub("ɹ", "r"):gsub("ɚ", "ər"):gsub("ɝ", "ɜr"):gsub("ɡ", "g"))
 end
 
 --[[
