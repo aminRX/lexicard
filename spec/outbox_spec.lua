@@ -1,0 +1,75 @@
+local Outbox = require("lexicard_outbox")
+
+local function temp_path()
+    local path = os.tmpname()
+    os.remove(path)
+    return path
+end
+
+local function exists(path)
+    local f = io.open(path, "r")
+    if f then f:close() end
+    return f ~= nil
+end
+
+describe("Outbox", function()
+    it("persists items across reopen", function()
+        local path = temp_path()
+        local box = Outbox.open(path)
+        assert_eq(box:count(), 0)
+        box:add({ fields = { Headword = "give up" } }, 1000)
+        box:add({ fields = { Headword = "bank" } }, 1001)
+        local again = Outbox.open(path)
+        assert_eq(again:count(), 2)
+        assert_eq(again.items[1].note.fields.Headword, "give up")
+        assert_eq(again.items[2].created_at, 1001)
+        assert_true(again.items[1].id ~= again.items[2].id)
+        os.remove(path)
+    end)
+    it("applies outcomes: removes sent and duplicates, keeps the rest", function()
+        local path = temp_path()
+        local box = Outbox.open(path)
+        local a = box:add({ fields = { Headword = "a" } })
+        local b = box:add({ fields = { Headword = "b" } })
+        local c = box:add({ fields = { Headword = "c" } })
+        local d = box:add({ fields = { Headword = "d" } })
+        local summary = box:apply({
+            { id = a.id, kind = "ok" },
+            { id = b.id, kind = "duplicate", message = "dup" },
+            { id = c.id, kind = "error", message = "model not found" },
+            { id = d.id, kind = "unreachable", message = "timeout" },
+        })
+        assert_eq(summary.sent, 1)
+        assert_same(summary.duplicates, { "b" })
+        assert_eq(summary.failed, 1)
+        assert_eq(summary.remaining, 2)
+        local again = Outbox.open(path)
+        assert_eq(again:count(), 2)
+        assert_eq(again.items[1].last_error, "model not found")
+        assert_eq(again.items[1].attempts, 1)
+        assert_eq(again.items[2].attempts, 0)
+        os.remove(path)
+    end)
+    it("prefers a complete leftover temporary file", function()
+        local path = temp_path()
+        local f = assert(io.open(path .. ".tmp", "w"))
+        f:write('[{"id":"x","created_at":1,"note":{"fields":{"Headword":"x"}},"attempts":0,"last_error":""}]')
+        f:close()
+        assert_eq(Outbox.open(path):count(), 1)
+        os.remove(path .. ".tmp")
+        os.remove(path)
+    end)
+    it("moves a corrupt file aside instead of crashing", function()
+        local path = temp_path()
+        local f = assert(io.open(path, "w"))
+        f:write("{not json")
+        f:close()
+        assert_eq(Outbox.open(path):count(), 0)
+        assert_true(exists(path .. ".corrupt"))
+        os.remove(path .. ".corrupt")
+    end)
+    it("summarizes a flush", function()
+        assert_eq(Outbox.summary_text({ sent = 2, duplicates = { "bank" }, failed = 0, remaining = 1 }),
+            "Sent 2 · 1 already in deck (bank) · 1 still waiting")
+    end)
+end)
