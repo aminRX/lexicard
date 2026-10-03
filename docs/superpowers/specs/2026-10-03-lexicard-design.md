@@ -199,7 +199,7 @@ Fields, in order (the first is the one Anki checks for duplicates):
 **Card 1, Recognize (English → meaning)**
 
 - Front: the book sentence with the expression in bold, the headword, and `{{tts en_US:Headword}}`.
-- Back: the front, then IPA · pattern · part of speech, the Spanish equivalents, the definition, the warning (highlighted, if any), the example, collocations and the pronunciation tip behind `{{hint:…}}`, and the book in small type.
+- Back: the front, then IPA · pattern · part of speech, the Spanish equivalents, the definition, the warning (highlighted, if any), the example, collocations and the pronunciation tip in small type, and the book in small type. (Anki's `{{hint:…}}` links would show raw field names like "PronTip", so they aren't used.)
 
 **Card 2, Produce (Spanish → English)**
 
@@ -242,7 +242,7 @@ On the first successful connection, Lexicard creates the deck and the note type 
 
 ## 11. Testing
 
-- **Unit tests** (busted on LuaJIT, on the Mac): `.env` parsing, sentence cutting, request shape, reply validation and sanitizing, note mapping and cloze, IPA lookup and ARPAbet→IPA conversion, AnkiConnect error classification with a fake transport, and outbox flushing with a fake sender and a simulated crash.
+- **Unit tests** (a dependency-free runner, `spec/runner.lua`, on LuaJIT on the Mac): `.env` parsing, sentence cutting, request shape, reply validation and sanitizing, note mapping and cloze, IPA lookup and ARPAbet→IPA conversion, AnkiConnect error classification with a fake transport, and outbox flushing with a fake sender and a simulated crash.
 - **Prompt evaluation:** 12 self-written inputs (split phrasal verb, false friends, a word with several meanings, an idiom, an irregular past tense, a literary word, slang, a name, a typo, and so on) run through both models. Results are reviewed by hand before settling the defaults. Output is git-ignored.
 - **End to end on the Mac:** `try-card --send` creates a card in a scratch deck, checks it with `notesInfo`, then deletes it.
 - **On the Kindle:** hold a word in an EPUB, check that the card appears in *Reading vocabulary* and then on the iPhone after sync. Offline path: close Anki, save two cards, reopen Anki, turn Wi-Fi on, and check both arrive.

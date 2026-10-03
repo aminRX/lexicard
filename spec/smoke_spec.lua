@@ -1,0 +1,8 @@
+describe("runner", function()
+    it("runs assertions", function()
+        assert_eq(1 + 1, 2)
+        assert_same({ a = { 1, 2 } }, { a = { 1, 2 } })
+        assert_match("hello", "^h")
+        assert_true(true)
+    end)
+end)

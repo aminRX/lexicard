@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Lexicard pre-commit: refuse to commit secrets. Enable with: git config core.hooksPath scripts/hooks
+status=0
+if git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)\.env$' >/dev/null; then
+    echo "pre-commit: refusing to commit a .env file" >&2
+    status=1
+fi
+added=$(git diff --cached -U0 --diff-filter=ACMR | grep -E '^\+[^+]' || true)
+if printf '%s\n' "$added" | grep -E 'AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}' >/dev/null; then
+    echo "pre-commit: staged lines contain something that looks like a Gemini API key" >&2
+    status=1
+fi
+if printf '%s\n' "$added" | grep -E '(GEMINI_API_KEY|ANKICONNECT_API_KEY)=[A-Za-z0-9._-]{16,}' >/dev/null; then
+    echo "pre-commit: staged lines contain a filled-in API key" >&2
+    status=1
+fi
+exit $status

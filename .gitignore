@@ -6,6 +6,9 @@
 # Prompt evaluation output (may contain model replies with book text)
 eval/out/
 
+# Downloaded build inputs
+build/
+
 # macOS
 .DS_Store
 ._*
