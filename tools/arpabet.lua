@@ -22,7 +22,7 @@ for _, cluster in ipairs({
 local function symbol(unit)
     if unit.vowel then
         if unit.base == "AH" then return unit.stress == 0 and "ə" or "ʌ" end
-        if unit.base == "ER" then return unit.stress == 0 and "ɚ" or "ɝ" end
+        if unit.base == "ER" then return "ər" end
         return VOWELS[unit.base]
     end
     return CONSONANTS[unit.base]
