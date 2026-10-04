@@ -1,7 +1,10 @@
 --[[
-Turns a validated card into an AnkiConnect note, and into preview text.
+Turns a finished card into an AnkiConnect note, and into preview text.
 Model text is escaped; only balanced <b></b> survives in Context and Example.
+The book sentence comes from KOReader, not from the model.
 ]]
+local Text = require("lexicard_text")
+
 local Note = {}
 
 local function escape_html(s)
@@ -36,20 +39,33 @@ function Note.ensure_bold(text, candidates)
     return text
 end
 
+-- First-letter cloze: "<b>gave up</b>" → "g____ ____".
 function Note.cloze(example_html)
-    local cloze, n = example_html:gsub("<b>.-</b>", "_____", 1)
+    local cloze, n = example_html:gsub("<b>(.-)</b>", function(inner)
+        local parts = {}
+        for word in Text.strip_tags(inner):gmatch("%S+") do
+            if #parts == 0 then
+                parts[1] = word:match("^[%z\1-\127\194-\244][\128-\191]*") .. "____"
+            else
+                parts[#parts + 1] = "____"
+            end
+        end
+        return table.concat(parts, " ")
+    end, 1)
     if n == 0 then return "" end
     return cloze
 end
 
 function Note.pattern(card)
     local pattern = card.pattern or ""
-    if pattern:lower() == (card.headword or ""):lower() then pattern = "" end
-    local register = card.register or ""
-    if register ~= "" and register ~= "neutral" then
-        pattern = pattern ~= "" and (pattern .. " · " .. register) or register
-    end
+    if pattern:lower() == (card.headword or ""):lower() then return "" end
     return pattern
+end
+
+function Note.register(card)
+    local register = card.register or ""
+    if register == "neutral" then return "" end
+    return register
 end
 
 function Note.book_label(input)
@@ -82,37 +98,60 @@ function Note.tags(card, input)
     local tags = { "lexicard" }
     local slug = Note.slug(input.book_title)
     if slug ~= "" then tags[#tags + 1] = "book::" .. slug end
-    if (card.cefr or "") ~= "" then tags[#tags + 1] = "cefr::" .. card.cefr end
     return tags
 end
 
-local function strip_marks(s)
-    return (s:gsub("⟦", ""):gsub("⟧", ""))
+-- The book sentence with the expression in bold, everything else escaped.
+function Note.context_html(sentence, expression, word)
+    if (sentence or "") == "" then return "" end
+    local marker = sentence:find("⟦", 1, true)
+    local plain = Text.strip_marks(sentence)
+    local lower = plain:lower()
+    local i, j
+    if (expression or "") ~= "" then
+        i, j = lower:find(expression:lower(), math.max(1, (marker or 1) - 40), true)
+        if not i then i, j = lower:find(expression:lower(), 1, true) end
+    end
+    if not i and marker then i, j = marker, marker + #(word or "") - 1 end
+    if not i then return escape_html(plain) end
+    return escape_html(plain:sub(1, i - 1)) .. "<b>" .. escape_html(plain:sub(i, j)) .. "</b>"
+        .. escape_html(plain:sub(j + 1))
 end
+
+local OPEN_POS = { ["phrasal verb"] = true, idiom = true }
 
 function Note.fields(card, input)
     local example = Note.keep_bold(Note.ensure_bold(card.example,
-        { card.expression_in_text, card.headword, card.surface }))
+        { card.expression_in_text, card.headword, input.word }))
+    local open = OPEN_POS[card.pos] or (card.expression_in_text or ""):find("%s") ~= nil
     return {
         Headword = escape_html(card.headword),
         POS = escape_html(card.pos),
         Pattern = escape_html(Note.pattern(card)),
-        IPA = escape_html(card.ipa),
+        Register = escape_html(Note.register(card)),
+        IPA = escape_html(card.ipa or ""),
         Spanish = escape_html(table.concat(card.spanish, " / ")),
         Definition = escape_html(card.definition),
-        Context = Note.keep_bold(strip_marks(card.context)),
+        Context = Note.context_html(input.sentence, card.expression_in_text, input.word),
+        ContextOpen = open and "1" or "",
         Example = example,
         Cloze = Note.cloze(example),
         Collocations = escape_html(table.concat(card.collocations, " · ")),
-        Warning = escape_html(card.warning),
-        PronTip = escape_html(card.pron_tip),
+        Warning = escape_html(card.warning or ""),
+        PronTip = escape_html(card.pron_tip or ""),
         Book = escape_html(Note.book_label(input)),
-        CEFR = escape_html(card.cefr),
+        Audio = "",
+        CEFR = "",
     }
 end
 
-function Note.build(card, input, cfg, allow_duplicate)
-    return {
+function Note.audio_filename(card, now)
+    local slug = Note.slug(card.headword)
+    return ("lexicard-%s-%d.wav"):format(slug ~= "" and slug or "word", now or os.time())
+end
+
+function Note.build(card, input, cfg, allow_duplicate, audio)
+    local note = {
         deckName = cfg.anki_deck,
         modelName = cfg.anki_note_type,
         fields = Note.fields(card, input),
@@ -123,33 +162,36 @@ function Note.build(card, input, cfg, allow_duplicate)
             duplicateScopeOptions = { deckName = cfg.anki_deck, checkChildren = false, checkAllModels = false },
         },
     }
+    if audio and audio ~= "" then
+        note.audio = { { data = audio, filename = Note.audio_filename(card), fields = { "Audio" } } }
+    end
+    return note
 end
 
 local function plain(s)
-    return strip_marks((s:gsub("</?[bB]>", "")))
+    return Text.strip_marks(Text.strip_tags(s))
 end
 
 function Note.preview_text(card, input, deck)
     local lines = {}
     local function add(s) lines[#lines + 1] = s end
-    add(card.headword .. "   " .. card.ipa)
+    add(card.headword .. "   " .. (card.ipa or ""))
     local meta = { card.pos }
-    local pattern = Note.pattern(card)
-    if pattern ~= "" then meta[#meta + 1] = pattern end
-    if card.cefr ~= "" then meta[#meta + 1] = card.cefr end
+    if Note.pattern(card) ~= "" then meta[#meta + 1] = Note.pattern(card) end
+    if Note.register(card) ~= "" then meta[#meta + 1] = Note.register(card) end
     add(table.concat(meta, " · "))
     add("")
     add(table.concat(card.spanish, " / "))
     add(card.definition)
-    if card.warning ~= "" then
+    if (card.warning or "") ~= "" then
         add("")
         add("⚠ " .. card.warning)
     end
     add("")
     add("Example: " .. plain(card.example))
-    if card.context ~= "" then add("Book: " .. plain(card.context)) end
+    if (input.sentence or "") ~= "" then add("Book: " .. plain(input.sentence)) end
     if #card.collocations > 0 then add("Collocations: " .. table.concat(card.collocations, " · ")) end
-    if card.pron_tip ~= "" then add("Pronunciation: " .. card.pron_tip) end
+    if (card.pron_tip or "") ~= "" then add("Pronunciation: " .. card.pron_tip) end
     add("")
     add(("Saves 2 cards to “%s”."):format(deck))
     return table.concat(lines, "\n")
