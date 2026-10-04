@@ -73,23 +73,6 @@ Traps.PREPOSITION_ERRORS = {
     "*lose the bus → miss the bus", "*I am agree → I agree",
 }
 
-Traps.SOUNDS = {
-    { "v_b", "/v/ is not /b/: very /ˈvɛri/" },
-    { "short_i", "/ɪ/ is not /i/: ship /ʃɪp/, sheep /ʃip/" },
-    { "vowels", "/æ/, /ʌ/ and /ɑ/ differ: cat /kæt/, cut /kʌt/, cot /kɑt/" },
-    { "schwa", "weak vowel /ə/: today /təˈdeɪ/" },
-    { "s_cluster", "no extra e- before s + consonant: school /skul/" },
-    { "ed_ending", "-ed is /t/, /d/ or /ɪd/: walked /wɔkt/, played /pleɪd/, wanted /ˈwɑntɪd/" },
-    { "z_sound", "/z/, not /s/: eyes /aɪz/" },
-    { "th", "/θ/ and /ð/: think /θɪŋk/, this /ðɪs/" },
-    { "j_y", "/dʒ/ is not /j/: jet /dʒɛt/, yet /jɛt/" },
-    { "sh_ch", "/ʃ/ is not /tʃ/: share /ʃɛr/, chair /tʃɛr/" },
-    { "h_sound", "soft /h/, not the Spanish jota: house /haʊs/" },
-    { "final_cluster", "final consonant groups: next /nɛkst/" },
-    { "stress", "word stress: breakfast /ˈbrɛkfəst/" },
-    { "silent_letter", "silent letters: island /ˈaɪlənd/" },
-}
-
 Traps.PREPOSITIONS = {}
 for w in ("of on in at to for with about from by into onto over up"):gmatch("%S+") do Traps.PREPOSITIONS[w] = true end
 
@@ -131,10 +114,7 @@ function Traps.prompt_lists()
         "",
         "Known preposition and calque errors (* = wrong):",
         table.concat(Traps.PREPOSITION_ERRORS, "; "),
-        "",
-        "Sound traps (put the name in `sound`):",
     }
-    for _, s in ipairs(Traps.SOUNDS) do lines[#lines + 1] = ("%s: %s"):format(s[1], s[2]) end
     return table.concat(lines, "\n")
 end
 

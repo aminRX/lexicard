@@ -6,8 +6,9 @@ local Text = require("lexicard_text")
 
 local cfg = Config.from_values({ GEMINI_API_KEY = "k" })
 local input = { word = "gave", sentence = "she finally ⟦gave⟧ it up.", book_title = "Example Book", book_author = "Ann Author" }
-local ORDER = { "status", "expression_in_text", "headword", "pos", "sense", "ipa", "pattern", "register",
-                "definition", "spanish", "trap", "warning", "sound", "pron_tip", "example", "collocations" }
+local ORDER = { "status", "expression_in_text", "headword", "pos", "sense", "ipa", "register", "definition",
+                "spanish", "trap", "warning", "usage", "picture_format", "picture_scene", "picture_caption" }
+local FORMATS = { object = true, action = true, before_after = true, contrast = true, manner = true }
 
 describe("Prompt", function()
     it("fills the learner profile into the system instruction", function()
@@ -65,15 +66,27 @@ describe("Prompt", function()
     it("uses worked examples that pass our own checks", function()
         local text = Prompt.system_instruction(cfg)
         for block in text:gmatch("<example>(.-)</example>") do
-            local sentence = block:match("<sentence>(.-)</sentence>")
-            local json = block:match("\n(%b{})")
-            local ex = assert(Json.decode(json), "example JSON")
-            ex.surface = block:match("<word>(.-)</word>")
+            local sentence = Text.strip_marks(block:match("<sentence>(.-)</sentence>"))
+            local ex = assert(Json.decode(block:match("\n(%b{})")), "example JSON")
             assert_true(not Text.mentions(ex.definition, ex.headword), "definition uses headword: " .. ex.headword)
-            assert_true(#Text.words(ex.example) <= 12, "example too long: " .. ex.headword)
-            assert_true(Text.overlap(ex.example, Text.strip_marks(sentence)) <= 0.5, "example copies book: " .. ex.headword)
+            assert_true(#ex.usage >= 2 and #ex.usage <= 3, "usage count: " .. ex.headword)
+            for _, item in ipairs(ex.usage) do
+                assert_true(item.pattern ~= "", "empty pattern: " .. ex.headword)
+                assert_true(#Text.words(item.example) <= 12, "example too long: " .. item.example)
+                assert_true(item.example:find("<b>", 1, true) ~= nil, "example not bold: " .. item.example)
+                assert_true(Text.overlap(item.example, sentence) <= 0.5, "example copies book: " .. item.example)
+            end
+            assert_true(FORMATS[ex.picture_format], "picture_format: " .. ex.headword)
+            assert_true(#Text.words(ex.picture_scene) <= 70, "scene too long: " .. ex.headword)
+            assert_true(#Text.words(ex.picture_caption) <= 10, "caption too long: " .. ex.headword)
+            assert_true(ex.picture_caption:find("<b>", 1, true) ~= nil, "caption not bold: " .. ex.headword)
             assert_eq((Repair.warning(ex)), ex.warning, "warning for " .. ex.headword)
-            assert_eq(Repair.pron_tip(ex), ex.pron_tip, "pron_tip for " .. ex.headword)
         end
+    end)
+    it("asks for everyday examples and picture-dictionary pictures", function()
+        local text = Prompt.system_instruction(cfg)
+        assert_match(text, "everyday life")
+        assert_match(text, "picture dictionary")
+        assert_true(not text:find("pron_tip", 1, true))
     end)
 end)
