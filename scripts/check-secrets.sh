@@ -5,8 +5,8 @@ history=$(mktemp)
 trap 'rm -f "$history"' EXIT
 git log --all -p > "$history"
 status=0
-if grep -E 'AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}' "$history" >/dev/null; then
-    echo "Something that looks like a Gemini key is in the history." >&2
+if grep -E 'AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|cf[a-z]{2}_[0-9A-Za-z]{30,}' "$history" >/dev/null; then
+    echo "Something that looks like a Gemini or Cloudflare key is in the history." >&2
     status=1
 fi
 if git log --all --name-only --format= | grep -E '(^|/)\.env$' >/dev/null; then
@@ -18,7 +18,7 @@ if [ -f .env ]; then
         key=${line%%=*}
         value=${line#*=}
         case "$key" in
-            GEMINI_API_KEY|ANKICONNECT_API_KEY|ANKICONNECT_URLS)
+            GEMINI_API_KEY|ANKICONNECT_API_KEY|ANKICONNECT_URLS|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID)
                 if [ -n "$value" ] && grep -F -- "$value" "$history" >/dev/null; then
                     echo "The value of $key from .env appears in the history." >&2
                     status=1

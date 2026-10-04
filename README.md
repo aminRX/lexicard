@@ -1,37 +1,46 @@
 # Lexicard
 
-A KOReader plugin for learning English while you read. Hold a word, tap **Lexicard** in the dictionary popup, and Google Gemini writes a vocabulary card for that word *as it's used in your book*. After a quick preview, the card goes to your Anki deck through AnkiConnect, with a natural-sounding recording of the word, and Anki's sync takes it to your phone.
+A KOReader plugin for learning English while you read. Hold a word, tap **Lexicard** in the dictionary popup, and Google Gemini writes a vocabulary card for that word *in the sense it has in your book*. Save it and keep reading: the card goes to your Anki deck in the background, with a recording of the word and a picture that shows what it means. Anki's sync then takes it to your phone.
 
 https://github.com/user-attachments/assets/1b348b2b-cc68-4b45-adc9-8850c332711b
 
-The cards are written for native Spanish speakers (B1–B2) by default. Hold "gave" in *"…she finally gave it up."* and you get:
+The cards are written for native Spanish speakers (B1–B2) by default. Hold "gave" in *"…she finally gave it up."* and you get one card:
 
 ```
-give up   /ˌɡɪv ˈʌp/
-phrasal verb · give sth up
+FRONT   give up   /ˌɡɪv ˈʌp/ · phrasal verb   ▶ audio
 
-dejar / abandonar
-to stop doing something that you did regularly
+BACK    [picture: before → after]
+        He gave up coffee.
+        dejar / abandonar
+        to stop doing something that you did regularly
 
-Example: I gave up coffee a month ago.
-Book: …she finally gave it up.
-Collocations: give up smoking · give up hope
+        HOW TO USE IT
+        give up + something   I gave up coffee a month ago.
+        give up + -ing        My dad gave up smoking last year.
+
+        From your book: “…she finally gave it up.”
 ```
 
 ## What's on a card
 
-Each word becomes two Anki cards:
+One English card per word:
 
-- **Recognize (English → meaning).** Front: the word and its audio, with the book sentence one tap away (shown directly for phrasal verbs and idioms, where the meaning depends on it). Back: Spanish equivalents, a short English definition, IPA · part of speech · pattern · register, a warning about real traps for Spanish speakers (✗ … → ✓ …), a pronunciation tip when there is a real trap, the book sentence and the book title.
-- **Produce (Spanish → English).** Front: "Say it in English", the Spanish, the definition, the part of speech, and a new example with first-letter hints (*I g____ ____ coffee a month ago.*). Back: the word with its audio, IPA · pattern, the full example, collocations, warning and tip.
+- **Front:** the word, its IPA and part of speech, and its audio.
+- **Back:**
+  - **A picture that teaches the word**, like a picture dictionary. A thing is drawn big. Stopping or changing is drawn as before → after. Qualities and adjectives are drawn as a contrast. Ways of moving use dotted paths. A short caption gives the sentence the picture shows.
+  - **The Spanish equivalents**, and **a short English definition**.
+  - **How to use it:** 2–3 common sentence patterns, each with an everyday example.
+  - **A warning**, only when there is a real trap for Spanish speakers (false friends, wrong prepositions, calques, English pairs that share one Spanish word).
+  - **The sentence from your book**, small, at the bottom.
+
+Examples and pictures come from everyday life (home, work, food, friends), never from the book's world. The book sentence is only used to pick the right meaning.
 
 Gemini writes the card and code checks it:
 
-- Pronunciation comes from the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict) in American style, with phrasal-verb stress (/ˌɡɪv ˈʌp/); Gemini's IPA is used only for words the dictionary lacks, and only if it looks valid.
-- Warnings are kept only when they are real Spanish-speaker traps (false friends, wrong prepositions, calques, English pairs that share one Spanish word, register). A table of common false friends and confusable pairs fills in a warning Gemini missed.
-- Pronunciation tips must quote a sound from the IPA and never talk about spelling.
+- Pronunciation comes from the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict) in American style, with phrasal-verb stress (/ˌɡɪv ˈʌp/). Gemini's IPA is used only for words the dictionary lacks, and only if it looks valid.
+- Warnings are kept only when they are real traps. A table of common false friends and confusable pairs fills in one Gemini missed.
 - Spanish equivalents are de-duplicated, and look-alikes and vulgar words are dropped.
-- If the definition uses the word itself, or the example copies the book, Lexicard asks the backup model once.
+- If the definition uses the word itself, or an example copies the book, Lexicard asks the backup model once.
 
 Gemini spots whole expressions from a single held word (phrasal verbs, idioms), picks the sense used in your sentence, and flags names and typos instead of making cards for them.
 
@@ -40,6 +49,7 @@ Gemini spots whole expressions from a single held word (phrasal verbs, idioms), 
 - A Kindle (or other device) running KOReader 2026.07 or later.
 - Anki desktop with an up-to-date [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on, on a computer on the same Wi-Fi as the reader.
 - A free Gemini API key from <https://aistudio.google.com/apikey>.
+- For pictures (optional, free): a Cloudflare account. Open the [Workers AI page](https://dash.cloudflare.com/?to=/:account/ai/workers-ai), choose **Use REST API**, then **Create a Workers AI API Token** (it needs Workers AI Read and Edit, nothing else). Copy the token and the **Account ID**. The free allowance covers about 95 pictures a day.
 
 ## Install
 
@@ -54,6 +64,9 @@ Gemini spots whole expressions from a single held word (phrasal verbs, idioms), 
 | `GEMINI_API_KEY` | Your Gemini API key (required) |
 | `ANKICONNECT_URLS` | Comma-separated AnkiConnect addresses, tried in order, e.g. `http://192.168.1.10:8765` (required) |
 | `ANKICONNECT_API_KEY` | The `apiKey` set in AnkiConnect's config; leave empty if you didn't set one |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Turn pictures on (see Requirements) |
+| `IMAGES` | `on` (default) or `off` |
+| `IMAGE_MODEL` | Default `@cf/black-forest-labs/flux-2-klein-4b` |
 | `ANKI_DECK` | Target deck (default `Reading vocabulary`) |
 | `ANKI_NOTE_TYPE` | Note type to create and use (default `Lexicard`) |
 | `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL` | Defaults `gemini-3.5-flash-lite`, then `gemini-3.6-flash` |
@@ -74,30 +87,35 @@ In Anki: **Tools → Add-ons → AnkiConnect → Config**.
 
 Lexicard creates the deck and the "Lexicard" note type the first time it connects.
 
-Optional, from a clone of this repository: `python3 scripts/anki-deck-preset.py` gives the deck its own options preset that keeps a word's two cards off the same day (sibling burying) and shows the Recognize card first. Other decks are untouched.
+Optional, from a clone of this repository: `python3 scripts/anki-deck-preset.py` gives the deck its own options preset. Other decks are untouched.
 
-### Upgrading from v0.1
+### Upgrading to v0.3
 
-The first card you save after upgrading adds three fields (`Register`, `ContextOpen`, `Audio`) to the "Lexicard" note type. Anki treats that as a structural change and asks for a **one-time full sync**: on the computer press **Sync** and choose **Upload to AnkiWeb**; on your phone choose **Download from AnkiWeb**. Sync your phone *before* upgrading so no reviews are lost. Lexicard tells you when Anki couldn't sync.
+The first card you save after upgrading adds fields to the "Lexicard" note type (`Usage`, `Image`, `Caption`) and switches it to one English card. Cards you already have keep their content and history. If you had the old Spanish→English cards, they stay, but new words don't get one.
+
+Optional, from a clone of this repository, with Anki open: `luajit scripts/upgrade-v0.3.lua` deletes the old Spanish→English cards and gives your existing words usage patterns and a picture. Try `--dry-run` first.
+
+Either way, Anki treats the change as structural and asks for a **one-time full sync**. On the computer press **Sync** and choose **Upload to AnkiWeb**; on your phone choose **Download from AnkiWeb**. Sync your phone *before* upgrading so no reviews are lost.
 
 ## Use
 
 - Hold a word → **Lexicard** → wait for the preview → **Save** (or **Regenerate** / **Cancel**).
-- If Anki can't be reached, the card is kept on the device and sent automatically the next time it can be. You can also send waiting cards by hand.
+- Save returns to your book at once. The audio and picture are made while you read, and a short notice appears when the card is in Anki.
+- If Anki can't be reached, the card's text waits on the device and is sent automatically the next time Anki can be reached. Audio and pictures are never stored on the reader: they are made at the moment the card is sent.
 - **Tools → Lexicard** has: *Send waiting cards*, *Test connections*, *Update note type in Anki* and *About*.
 
 If you customized the dictionary popup's buttons before installing, enable **Lexicard** under *Customize buttons*.
 
 ## Privacy
 
-For each card, Lexicard sends Gemini the held word, its sentence, and the book's title and author; when you save, it sends the word again to generate the audio. Nothing else leaves the device. Gemini's free tier may use prompts to improve Google's products. Your keys stay in `.env`, which is never committed.
+For each card, Lexicard sends Gemini the held word, its sentence, and the book's title and author. When the card is sent, Gemini gets the word again to make the audio. With pictures on, Cloudflare gets one English description of an everyday scene, never the book text. Nothing else leaves the device, and nothing heavy stays on it. Gemini's free tier may use prompts to improve Google's products. Your keys stay in `.env`, which is never committed.
 
 ## Development
 
 ```bash
 git config core.hooksPath scripts/hooks     # blocks commits that contain keys
 luajit spec/runner.lua                      # all tests (no dependencies besides LuaJIT)
-luajit scripts/try-card.lua gave "She finally ⟦gave⟧ it up." "Book — Author"   # one card from the Mac
+luajit scripts/try-card.lua gave "She finally ⟦gave⟧ it up." "Book — Author" --image   # one card + picture, saved in eval/out/
 EVAL_LABEL=mine EVAL_DELAY=5 luajit scripts/eval-prompt.lua   # scored run over eval/cases.lua (eval/out/)
 scripts/deploy.sh --eject                   # copy to a USB-mounted Kindle
 scripts/check-secrets.sh                    # scan git history before publishing
