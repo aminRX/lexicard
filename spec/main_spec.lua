@@ -2,15 +2,19 @@ local Fake = require("fake_koreader")
 local Json = require("lexicard_json")
 
 local CARD = {
-    status = "ok", surface = "gave", expression_in_text = "gave it up", headword = "give up",
-    pos = "phrasal verb", pattern = "give sth up", register = "neutral", cefr = "B1",
-    definition = "to stop doing something", spanish = { "dejar" },
-    context = "she finally <b>gave it up</b>.", example = "He <b>gave up</b> smoking.",
-    collocations = {}, warning = "", pron_tip = "", ipa = "/ɡɪv ʌp/",
+    status = "ok", expression_in_text = "gave it up", headword = "give up", pos = "phrasal verb",
+    sense = "stopped", ipa = "/ˌɡɪv ˈʌp/", pattern = "give sth up", register = "neutral",
+    definition = "to stop doing something", spanish = { "dejar" }, trap = "none", warning = "",
+    sound = "none", pron_tip = "", example = "He <b>gave up</b> coffee.", collocations = {},
 }
 
 local function transport_for(state)
     return function(request)
+        if request.url:find("%-tts:generateContent") then
+            if state.tts_down then return 500, "{}" end
+            return 200, Json.encode({ candidates = { { content = { parts = {
+                { inlineData = { mimeType = "audio/wav", data = "UklGRg==" } } } } } } })
+        end
         if request.url:find("generativelanguage", 1, true) then
             local text = Json.encode(state.card or CARD)
             return 200, Json.encode({ candidates = { { content = { parts = { { text = text } } } } } })
@@ -24,7 +28,9 @@ local function transport_for(state)
             end
             state.notes[#state.notes + 1] = req.params.note
         end
-        local results = { version = 6, deckNames = { "Reading vocabulary" }, modelNames = { "Lexicard" }, addNote = 1 }
+        local NoteType = require("lexicard_notetype")
+        local results = { version = 6, deckNames = { "Reading vocabulary" }, modelNames = { "Lexicard" }, addNote = 1,
+                          modelFieldNames = NoteType.FIELDS, modelStyling = { css = NoteType.CSS } }
         return 200, Json.encode({ result = results[req.action] or Json.null, error = Json.null })
     end
 end
@@ -69,8 +75,17 @@ describe("Lexicard plugin (fake KOReader)", function()
         assert_eq(state.notes[1].deckName, "Reading vocabulary")
         assert_eq(state.notes[1].fields.Headword, "give up")
         assert_eq(state.notes[1].fields.Book, "Example Book — Ann Author")
+        assert_eq(state.notes[1].fields.Context, "she finally <b>gave it up</b>.")
+        assert_eq(state.notes[1].audio[1].data, "UklGRg==")
         assert_eq(state.actions[#state.actions], "sync")
         assert_match(Fake.last("info").text, "Added to Reading vocabulary")
+    end)
+    it("saves without audio when the voice fails", function()
+        local state = { tts_down = true }
+        local _, ui = setup(state)
+        hold_and_save(ui)
+        assert_eq(#state.notes, 1)
+        assert_eq(state.notes[1].audio, nil)
     end)
     it("keeps the card on the Kindle when Anki is unreachable", function()
         local plugin, ui = setup({ anki_down = true })

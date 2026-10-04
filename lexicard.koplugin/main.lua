@@ -13,13 +13,14 @@ local T = require("ffi/util").template
 local _ = require("gettext")
 
 local Anki = require("lexicard_anki")
+local Audio = require("lexicard_audio")
 local Config = require("lexicard_config")
 local Context = require("lexicard_context")
 local Gemini = require("lexicard_gemini")
 local Http = require("lexicard_http")
-local Ipa = require("lexicard_ipa")
 local Note = require("lexicard_note")
 local Outbox = require("lexicard_outbox")
+local Pipeline = require("lexicard_pipeline")
 local UI = require("lexicard_ui")
 
 local BUSY = _("Gemini is busy or out of free quota. Try again in a minute.")
@@ -44,7 +45,7 @@ local Lexicard = WidgetContainer:extend{
     is_doc_only = true,
 }
 
-Lexicard.VERSION = "0.1.0"
+Lexicard.VERSION = "0.2.0"
 
 function Lexicard:init()
     self.cfg, self.cfg_found = Config.load(self.path .. "/.env")
@@ -98,8 +99,7 @@ function Lexicard:generate(input)
             end
             return
         end
-        local card = result.card
-        card.ipa = Ipa.for_headword(self.ipa_path, card.headword, card.ipa) or card.ipa
+        local card = Pipeline.finish(result.card, input, self.ipa_path)
         logger.info("Lexicard: card for", card.headword, "from", result.model)
         UI.preview(Note.preview_text(card, input, cfg.anki_deck),
             function() self:generate(input) end,
@@ -114,15 +114,19 @@ end
 
 function Lexicard:save(card, input, allow_duplicate)
     local cfg = self.cfg
-    local note = Note.build(card, input, cfg, allow_duplicate)
     if not NetworkMgr:isConnected() then
-        self:keepOnKindle(note)
+        self:keepOnKindle(Note.build(card, input, cfg, allow_duplicate))
         return
     end
     Trapper:wrap(function()
-        local completed, outcome = Trapper:dismissableRunInSubprocess(function()
-            return Anki.deliver(Http.transport(cfg.tls_verify), cfg, note)
+        local completed, report = Trapper:dismissableRunInSubprocess(function()
+            local transport = Http.transport(cfg.tls_verify)
+            local audio = Audio.generate(cfg, card, transport)
+            local note = Note.build(card, input, cfg, allow_duplicate, audio)
+            return { note = note, outcome = Anki.deliver(transport, cfg, note) }
         end, _("Lexicard: sending to Anki…"))
+        local note = type(report) == "table" and report.note or Note.build(card, input, cfg, allow_duplicate)
+        local outcome = type(report) == "table" and report.outcome or nil
         if not completed or type(outcome) ~= "table" then
             self:keepOnKindle(note)
         elseif outcome.kind == "ok" then
