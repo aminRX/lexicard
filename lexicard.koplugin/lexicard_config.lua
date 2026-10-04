@@ -11,6 +11,9 @@ Config.DEFAULTS = {
     LEARNER_NATIVE_LANGUAGE = "Spanish (Mexico)",
     LEARNER_LEVEL = "B1-B2",
     TLS_VERIFY = "true",
+    AUDIO = "word",
+    TTS_MODEL = "gemini-3.8-flash-lite-tts",
+    TTS_VOICE = "Kore",
 }
 
 local function trim(s)
@@ -43,6 +46,8 @@ local function split_urls(s)
     return urls
 end
 
+local AUDIO_MODES = { word = true, ["word+example"] = true, off = true }
+
 function Config.from_values(values)
     local v = {}
     for key, default in pairs(Config.DEFAULTS) do v[key] = default end
@@ -60,6 +65,10 @@ function Config.from_values(values)
         native_language = v.LEARNER_NATIVE_LANGUAGE,
         level = v.LEARNER_LEVEL,
         tls_verify = v.TLS_VERIFY:lower() ~= "false",
+        gemini_thinking = v.GEMINI_THINKING or "",
+        audio = AUDIO_MODES[v.AUDIO:lower()] and v.AUDIO:lower() or "word",
+        tts_model = v.TTS_MODEL,
+        tts_voice = v.TTS_VOICE,
     }
 end
 
