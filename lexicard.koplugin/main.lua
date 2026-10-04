@@ -40,6 +40,7 @@ local NOT_A_WORD = {
     unclear = _("Couldn't make sense of “%1”. No card created."),
 }
 local WAITING = _("Saved on Kindle. It will be sent when Anki is reachable (%1 waiting).")
+local BUSY_ANKI = _("Anki is busy right now (syncing?). The card is saved on the Kindle and will be sent again in a minute.")
 
 local Lexicard = WidgetContainer:extend{
     name = "lexicard",
@@ -170,7 +171,10 @@ function Lexicard:afterSend(items, report, silent)
     local loud = mine or not silent
     if type(report) ~= "table" or report.setup_error then
         local failure = type(report) == "table" and report.setup_error or nil
-        if failure and failure.kind ~= "unreachable" then
+        if failure and failure.kind == "busy" then
+            if loud then UI.info(BUSY_ANKI) end
+            self:retrySoon()
+        elseif failure and failure.kind ~= "unreachable" then
             logger.warn("Lexicard: AnkiConnect setup failed", failure.message)
             if loud then UI.info(T(_("Anki said: %1\nThe card is saved on the Kindle."), tostring(failure.message))) end
         elseif loud then
@@ -180,9 +184,10 @@ function Lexicard:afterSend(items, report, silent)
     end
     local by_id = {}
     for _, item in ipairs(items) do by_id[item.id] = item end
-    local no_picture, other_duplicates = nil, {}
+    local no_picture, other_duplicates, busy = nil, {}, false
     for _, o in ipairs(report.outcomes) do
         local item = by_id[o.id]
+        if o.kind == "busy" then busy = true end
         if o.kind == "ok" and type(o.info) == "table" and o.info.picture ~= "ok" and o.info.picture ~= "none" then
             no_picture = no_picture or o.info.picture
         end
@@ -214,12 +219,25 @@ function Lexicard:afterSend(items, report, silent)
     if summary.failed > 0 then
         logger.warn("Lexicard: AnkiConnect error", summary.last_error)
         lines[#lines + 1] = T(_("Anki said: %1\nThe card is saved on the Kindle."), tostring(summary.last_error))
+    elseif busy then
+        if loud then lines[#lines + 1] = BUSY_ANKI end
     elseif summary.remaining > 0 and loud then
         lines[#lines + 1] = T(WAITING, summary.remaining)
     end
     if #lines > 0 and (loud or summary.sent > 0) then
         UI.info(table.concat(lines, "\n"), (summary.failed == 0 and not report.sync_error and not no_picture) and 3 or nil)
     end
+    if busy then self:retrySoon() end
+end
+
+-- Anki was busy (syncing): try once more in a minute.
+function Lexicard:retrySoon()
+    if self.retry_scheduled then return end
+    self.retry_scheduled = true
+    UIManager:scheduleIn(60, function()
+        self.retry_scheduled = false
+        self:sendWaiting(true)
+    end)
 end
 
 function Lexicard:onNetworkConnected()

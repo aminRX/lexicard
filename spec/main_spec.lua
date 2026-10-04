@@ -30,6 +30,10 @@ local function transport_for(state)
         local req = Json.decode(request.body)
         state.actions[#state.actions + 1] = req.action
         if req.action == "addNote" then
+            if state.busy_once then
+                state.busy_once = false
+                return 200, Json.encode({ result = Json.null, error = "'NoneType' object has no attribute 'list'" })
+            end
             if state.duplicate and not req.params.note.options.allowDuplicate then
                 return 200, Json.encode({ result = Json.null, error = "cannot create note because it is a duplicate" })
             end
@@ -162,6 +166,18 @@ describe("Lexicard plugin (fake KOReader)", function()
         Fake.last("confirm").ok_callback()
         assert_eq(#state.notes, 1)
         assert_eq(state.notes[1].options.allowDuplicate, true)
+    end)
+    it("retries by itself when Anki is busy syncing", function()
+        local state = { busy_once = true }
+        local plugin, ui = setup(state)
+        hold_and_save(ui)
+        assert_eq(#state.notes, 1)
+        assert_eq(plugin.outbox:count(), 0)
+        local seen_busy = false
+        for _, w in ipairs(Fake.shown) do
+            if w.kind == "info" and w.text:find("busy", 1, true) then seen_busy = true end
+        end
+        assert_true(seen_busy)
     end)
     it("tests the picture connection", function()
         local plugin = setup({})

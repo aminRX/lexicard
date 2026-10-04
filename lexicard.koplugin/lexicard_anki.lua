@@ -1,7 +1,8 @@
 --[[
 AnkiConnect client (API version 6). Every public function returns plain
 tables so it can run inside a KOReader subprocess.
-Kinds: "ok", "duplicate", "unreachable", "error".
+Kinds: "ok", "duplicate", "unreachable", "busy" (Anki's collection is closed, e.g. while
+it syncs: try again later), "error".
 ]]
 local Json = require("lexicard_json")
 local NoteType = require("lexicard_notetype")
@@ -15,13 +16,20 @@ function Anki.request_body(action, params, api_key)
     return Json.encode(req)
 end
 
+-- What AnkiConnect says while Anki's collection is closed (a sync, a profile switch).
+local BUSY = { "'nonetype' object has no attribute", "collection is not available", "collection is closed" }
+
 function Anki.classify(code, body)
     if type(code) ~= "number" then return "unreachable", tostring(body) end
     if code ~= 200 then return "error", "HTTP " .. code end
     local data = Json.decode(body or "")
     if type(data) ~= "table" then return "error", "invalid reply from AnkiConnect" end
     if type(data.error) == "string" and data.error ~= "" then
-        if data.error:lower():find("duplicate", 1, true) then return "duplicate", data.error end
+        local lower = data.error:lower()
+        if lower:find("duplicate", 1, true) then return "duplicate", data.error end
+        for _, pattern in ipairs(BUSY) do
+            if lower:find(pattern, 1, true) then return "busy", data.error end
+        end
         return "error", data.error
     end
     return "ok", data.result
@@ -140,7 +148,7 @@ function Anki.deliver_many(transport, cfg, items, prepare)
         local kind, message = Anki.call(transport, url, cfg, "addNote", { note = note }, 30)
         outcomes[#outcomes + 1] = { id = item.id, kind = kind, message = kind ~= "ok" and tostring(message) or nil, info = info }
         if kind == "ok" then sent = sent + 1 end
-        if kind == "unreachable" then break end
+        if kind == "unreachable" or kind == "busy" then break end
     end
     local report = { outcomes = outcomes }
     if sent > 0 then

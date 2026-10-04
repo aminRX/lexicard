@@ -96,7 +96,7 @@ function Outbox:apply(outcomes)
             local fields = type(item.note.fields) == "table" and item.note.fields or {}
             summary.duplicates[#summary.duplicates + 1] = fields.Headword or "?"
         else
-            if o and o.kind ~= "unreachable" then
+            if o and o.kind ~= "unreachable" and o.kind ~= "busy" then
                 item.attempts = (item.attempts or 0) + 1
                 item.last_error = o.message or o.kind
                 summary.failed = summary.failed + 1
