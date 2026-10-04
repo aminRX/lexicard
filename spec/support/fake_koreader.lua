@@ -46,6 +46,8 @@ package.loaded["ui/widget/container/widgetcontainer"] = {
 package.loaded["lexicard_http"] = {
     transport = function() return function(request) return Fake.transport(request) end end,
 }
+-- Background jobs run at once in tests.
+package.loaded["lexicard_background"] = { run = function(task, on_done) on_done(task()) end }
 
 function Fake.reset(opts)
     Fake.shown = {}
