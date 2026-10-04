@@ -1,15 +1,12 @@
 --[[
 Checks and repairs a card after Gemini, before the preview (pure).
-Run it after the IPA is final: the pronunciation-tip check compares against it.
 ]]
-local Ipa = require("lexicard_ipa")
 local Text = require("lexicard_text")
 local Traps = require("lexicard_traps")
 
 local Repair = {}
 
 local INFLECTIONS = { "", "s", "es", "d", "ed", "ing", "ly" }
-local SPELLING = { "letra", "doble", "se escribe", "escrit", "ortograf" }
 
 local function is_english_form(token, base)
     for _, suffix in ipairs(INFLECTIONS) do
@@ -55,27 +52,6 @@ function Repair.warning(card)
     return "", "none"
 end
 
-function Repair.pron_tip(card)
-    local sound, tip = card.sound or "none", card.pron_tip or ""
-    if sound == "none" or sound == "" or tip == "" then return "" end
-    local folded = Text.fold(tip)
-    for _, cue in ipairs(SPELLING) do
-        if folded:find(cue, 1, true) then return "" end
-    end
-    if sound == "ed_ending" then
-        local surface, head = Text.fold(card.surface or ""), Text.fold(card.headword or "")
-        if surface:sub(-2) ~= "ed" and head:sub(-2) ~= "ed" then return "" end
-    end
-    local ipa = Ipa.normalize(card.ipa or ""):gsub("%s", "")
-    local found = false
-    for segment in tip:gmatch("/([^/]+)/") do
-        local seg = Ipa.normalize(segment):gsub("%s", "")
-        if seg ~= "" and ipa:find(seg, 1, true) then found = true end
-    end
-    if not found then return "" end
-    return tip
-end
-
 function Repair.spanish(card)
     local ff = Traps.false_friend(card.headword)
     local head = Text.fold(card.headword)
@@ -104,7 +80,6 @@ end
 
 function Repair.apply(card)
     card.warning, card.trap = Repair.warning(card)
-    card.pron_tip = Repair.pron_tip(card)
     card.spanish = Repair.spanish(card)
     return card
 end

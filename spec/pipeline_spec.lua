@@ -9,18 +9,17 @@ local function write(lines)
 end
 
 describe("Pipeline.finish", function()
-    it("sets the IPA from the dictionary, then repairs warnings and tips", function()
+    it("sets the IPA from the dictionary, then repairs warnings and Spanish", function()
         local path = write({ "actually\tˈæktʃuəli" })
         local card = Pipeline.finish({
             headword = "actually", pos = "adverb", ipa = "/ˈæk.tʃu.əl.i/", register = "neutral",
-            spanish = { "actualmente", "en realidad" }, trap = "none", warning = "", sound = "stress",
-            pron_tip = "Cuidado con la doble l.",
+            spanish = { "actualmente", "en realidad" }, trap = "none", warning = "",
         }, { word = "actually", sentence = "" }, path)
         os.remove(path)
         assert_eq(card.ipa, "/ˈæktʃuəli/")
         assert_eq(card.surface, "actually")
         assert_eq(card.warning, "Falso amigo: ✗ «actualmente» → ✓ «en realidad»")
-        assert_eq(card.pron_tip, "")
+        assert_eq(card.pron_tip, nil)
         assert_same(card.spanish, { "en realidad" })
     end)
 end)

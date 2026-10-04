@@ -2,7 +2,7 @@ local Repair = require("lexicard_repair")
 
 local function card(over)
     local c = { headword = "word", surface = "word", pos = "noun", register = "neutral", ipa = "",
-                spanish = { "palabra" }, trap = "none", warning = "", sound = "none", pron_tip = "" }
+                spanish = { "palabra" }, trap = "none", warning = "" }
     for k, v in pairs(over or {}) do c[k] = v end
     return c
 end
@@ -31,20 +31,6 @@ describe("Repair.warning", function()
         assert_eq((Repair.warning(card({ headword = "gloaming", trap = "register", warning = "Muy literario." }))), "")
         assert_eq((Repair.warning(card({ headword = "gloaming", trap = "register", register = "literary",
             warning = "Muy literario." }))), "Muy literario.")
-    end)
-end)
-
-describe("Repair.pron_tip", function()
-    it("keeps a tip that quotes a sound from the IPA", function()
-        assert_eq(Repair.pron_tip(card({ headword = "leisurely", ipa = "/ˈlizərli/", sound = "vowels",
-            pron_tip = "La primera sílaba es /li/, como «li»." })), "La primera sílaba es /li/, como «li».")
-    end)
-    it("drops invented or spelling tips", function()
-        assert_eq(Repair.pron_tip(card({ ipa = "/ˈlizərli/", sound = "vowels", pron_tip = "Suena como «lé»." })), "")
-        assert_eq(Repair.pron_tip(card({ ipa = "/rɪˈlʌktənt/", sound = "stress", pron_tip = "Cuidado con la doble t: /lʌk/." })), "")
-        assert_eq(Repair.pron_tip(card({ ipa = "/rʌn/", sound = "none", pron_tip = "Es /rʌn/." })), "")
-        assert_eq(Repair.pron_tip(card({ headword = "run", surface = "ran", ipa = "/rʌn/", sound = "ed_ending",
-            pron_tip = "La -ed es /d/." })), "")
     end)
 end)
 

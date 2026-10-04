@@ -1,6 +1,6 @@
 --[[
 Everything that runs after Gemini and before the preview:
-the IPA from the dictionary first, then the repairs that compare against it.
+the IPA from the dictionary first, then the repairs.
 ]]
 local Ipa = require("lexicard_ipa")
 local Repair = require("lexicard_repair")
