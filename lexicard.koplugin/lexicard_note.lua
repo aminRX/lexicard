@@ -1,7 +1,8 @@
 --[[
-Turns a finished card into an AnkiConnect note, and into preview text.
-Model text is escaped; only balanced <b></b> survives in Context and Example.
-The book sentence comes from KOReader, not from the model.
+Turns a finished card into a text-only AnkiConnect note, and into preview text.
+Model text is escaped; only balanced <b></b> survives in Context, Usage and Caption.
+The book sentence comes from KOReader, not from the model. Audio and pictures are
+attached when the note is sent (lexicard_media).
 ]]
 local Text = require("lexicard_text")
 
@@ -37,29 +38,6 @@ function Note.ensure_bold(text, candidates)
         end
     end
     return text
-end
-
--- First-letter cloze: "<b>gave up</b>" → "g____ ____".
-function Note.cloze(example_html)
-    local cloze, n = example_html:gsub("<b>(.-)</b>", function(inner)
-        local parts = {}
-        for word in Text.strip_tags(inner):gmatch("%S+") do
-            if #parts == 0 then
-                parts[1] = word:match("^[%z\1-\127\194-\244][\128-\191]*") .. "____"
-            else
-                parts[#parts + 1] = "____"
-            end
-        end
-        return table.concat(parts, " ")
-    end, 1)
-    if n == 0 then return "" end
-    return cloze
-end
-
-function Note.pattern(card)
-    local pattern = card.pattern or ""
-    if pattern:lower() == (card.headword or ""):lower() then return "" end
-    return pattern
 end
 
 function Note.register(card)
@@ -118,40 +96,44 @@ function Note.context_html(sentence, expression, word)
         .. escape_html(plain:sub(j + 1))
 end
 
-local OPEN_POS = { ["phrasal verb"] = true, idiom = true }
+local function bold_expression(text, card, input)
+    return Note.keep_bold(Note.ensure_bold(text, { card.expression_in_text, card.headword, input.word }))
+end
+
+-- One line per usage pattern: '<div class="lx-use"><span class="lx-pattern">…</span> <span class="lx-ex">…</span></div>'.
+function Note.usage_html(card, input)
+    local lines = {}
+    for _, item in ipairs(card.usage or {}) do
+        local pattern = escape_html(item.pattern or "")
+        lines[#lines + 1] = '<div class="lx-use">'
+            .. (pattern ~= "" and ('<span class="lx-pattern">' .. pattern .. "</span> ") or "")
+            .. '<span class="lx-ex">' .. bold_expression(item.example, card, input) .. "</span></div>"
+    end
+    return table.concat(lines, "\n")
+end
 
 function Note.fields(card, input)
-    local example = Note.keep_bold(Note.ensure_bold(card.example,
-        { card.expression_in_text, card.headword, input.word }))
-    local open = OPEN_POS[card.pos] or (card.expression_in_text or ""):find("%s") ~= nil
+    local caption = card.picture_caption or ""
     return {
         Headword = escape_html(card.headword),
-        POS = escape_html(card.pos),
-        Pattern = escape_html(Note.pattern(card)),
-        Register = escape_html(Note.register(card)),
         IPA = escape_html(card.ipa or ""),
+        POS = escape_html(card.pos),
+        Register = escape_html(Note.register(card)),
         Spanish = escape_html(table.concat(card.spanish, " / ")),
         Definition = escape_html(card.definition),
-        Context = Note.context_html(input.sentence, card.expression_in_text, input.word),
-        ContextOpen = open and "1" or "",
-        Example = example,
-        Cloze = Note.cloze(example),
-        Collocations = escape_html(table.concat(card.collocations, " · ")),
-        Warning = escape_html(card.warning or ""),
-        PronTip = escape_html(card.pron_tip or ""),
-        Book = escape_html(Note.book_label(input)),
+        Usage = Note.usage_html(card, input),
+        Image = "",
+        Caption = caption ~= "" and bold_expression(caption, card, input) or "",
         Audio = "",
-        CEFR = "",
+        Warning = escape_html(card.warning or ""),
+        Context = Note.context_html(input.sentence, card.expression_in_text, input.word),
+        Book = escape_html(Note.book_label(input)),
     }
 end
 
-function Note.audio_filename(card, now)
-    local slug = Note.slug(card.headword)
-    return ("lexicard-%s-%d.wav"):format(slug ~= "" and slug or "word", now or os.time())
-end
-
-function Note.build(card, input, cfg, allow_duplicate, audio)
-    local note = {
+-- The note without media: audio and picture are added when it is sent (lexicard_media).
+function Note.build(card, input, cfg, allow_duplicate)
+    return {
         deckName = cfg.anki_deck,
         modelName = cfg.anki_note_type,
         fields = Note.fields(card, input),
@@ -162,38 +144,43 @@ function Note.build(card, input, cfg, allow_duplicate, audio)
             duplicateScopeOptions = { deckName = cfg.anki_deck, checkChildren = false, checkAllModels = false },
         },
     }
-    if audio and audio ~= "" then
-        note.audio = { { data = audio, filename = Note.audio_filename(card), fields = { "Audio" } } }
-    end
-    return note
 end
 
 local function plain(s)
     return Text.strip_marks(Text.strip_tags(s))
 end
 
-function Note.preview_text(card, input, deck)
+local FORMAT_LABEL = { before_after = " (before → after)", contrast = " (contrast)" }
+
+function Note.preview_text(card, input, deck, with_picture)
     local lines = {}
     local function add(s) lines[#lines + 1] = s end
     add(card.headword .. "   " .. (card.ipa or ""))
     local meta = { card.pos }
-    if Note.pattern(card) ~= "" then meta[#meta + 1] = Note.pattern(card) end
     if Note.register(card) ~= "" then meta[#meta + 1] = Note.register(card) end
     add(table.concat(meta, " · "))
     add("")
     add(table.concat(card.spanish, " / "))
     add(card.definition)
+    if #(card.usage or {}) > 0 then
+        add("")
+        add("How to use it:")
+        for _, item in ipairs(card.usage) do
+            add("• " .. ((item.pattern or "") ~= "" and (item.pattern .. " — ") or "") .. plain(item.example))
+        end
+    end
     if (card.warning or "") ~= "" then
         add("")
         add("⚠ " .. card.warning)
     end
     add("")
-    add("Example: " .. plain(card.example))
+    if with_picture and (card.picture_scene or "") ~= "" then
+        add("Picture" .. (FORMAT_LABEL[card.picture_format] or "") .. ": " .. card.picture_scene)
+    end
+    if (card.picture_caption or "") ~= "" then add("Caption: " .. plain(card.picture_caption)) end
     if (input.sentence or "") ~= "" then add("Book: " .. plain(input.sentence)) end
-    if #card.collocations > 0 then add("Collocations: " .. table.concat(card.collocations, " · ")) end
-    if (card.pron_tip or "") ~= "" then add("Pronunciation: " .. card.pron_tip) end
     add("")
-    add(("Saves 2 cards to “%s”."):format(deck))
+    add(("Saves 1 card to “%s”."):format(deck))
     return table.concat(lines, "\n")
 end
 
