@@ -1,11 +1,13 @@
 local Json = require("lexicard_json")
 local Prompt = require("lexicard_prompt")
 local Config = require("lexicard_config")
+local Repair = require("lexicard_repair")
+local Text = require("lexicard_text")
 
 local cfg = Config.from_values({ GEMINI_API_KEY = "k" })
 local input = { word = "gave", sentence = "she finally ⟦gave⟧ it up.", book_title = "Example Book", book_author = "Ann Author" }
-local ORDER = { "status", "surface", "expression_in_text", "headword", "pos", "pattern", "register", "cefr",
-                "definition", "spanish", "context", "example", "collocations", "warning", "pron_tip", "ipa" }
+local ORDER = { "status", "expression_in_text", "headword", "pos", "sense", "ipa", "pattern", "register",
+                "definition", "spanish", "trap", "warning", "sound", "pron_tip", "example", "collocations" }
 
 describe("Prompt", function()
     it("fills the learner profile into the system instruction", function()
@@ -53,6 +55,25 @@ describe("Prompt", function()
                 count = count + 1
             end
         end
-        assert_eq(count, 3)
+        assert_eq(count, 5)
+    end)
+    it("includes the trap reference lists", function()
+        local text = Prompt.system_instruction(cfg)
+        assert_match(text, "realize ≠ realizar → darse cuenta")
+        assert_match(text, "%*married with → married to")
+    end)
+    it("uses worked examples that pass our own checks", function()
+        local text = Prompt.system_instruction(cfg)
+        for block in text:gmatch("<example>(.-)</example>") do
+            local sentence = block:match("<sentence>(.-)</sentence>")
+            local json = block:match("\n(%b{})")
+            local ex = assert(Json.decode(json), "example JSON")
+            ex.surface = block:match("<word>(.-)</word>")
+            assert_true(not Text.mentions(ex.definition, ex.headword), "definition uses headword: " .. ex.headword)
+            assert_true(#Text.words(ex.example) <= 12, "example too long: " .. ex.headword)
+            assert_true(Text.overlap(ex.example, Text.strip_marks(sentence)) <= 0.5, "example copies book: " .. ex.headword)
+            assert_eq((Repair.warning(ex)), ex.warning, "warning for " .. ex.headword)
+            assert_eq(Repair.pron_tip(ex), ex.pron_tip, "pron_tip for " .. ex.headword)
+        end
     end)
 end)
