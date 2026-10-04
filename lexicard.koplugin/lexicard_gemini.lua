@@ -5,14 +5,15 @@ KOReader subprocess boundary.
 ]]
 local Json = require("lexicard_json")
 local Prompt = require("lexicard_prompt")
+local Text = require("lexicard_text")
 
 local Gemini = {}
 
 Gemini.BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/"
 
-local TEXT_FIELDS = { "surface", "expression_in_text", "headword", "pos", "pattern", "register", "cefr",
-                      "definition", "context", "example", "warning", "pron_tip", "ipa" }
-local REQUIRED = { "headword", "definition", "example", "ipa" }
+local TEXT_FIELDS = { "expression_in_text", "headword", "pos", "sense", "ipa", "pattern", "register",
+                      "definition", "trap", "warning", "sound", "pron_tip", "example" }
+local REQUIRED = { "headword", "definition", "example" }
 local STATUS_KINDS = { [408] = "busy", [429] = "quota", [500] = "busy", [502] = "busy", [503] = "busy", [504] = "busy" }
 
 local function trim(s)
@@ -37,14 +38,22 @@ function Gemini.normalize(raw)
     end
     card.spanish = list("spanish", 3)
     card.collocations = list("collocations", 3)
+    if card.trap == "" then card.trap = "none" end
+    if card.sound == "" then card.sound = "none" end
     if card.status ~= "ok" then return card end
     for _, key in ipairs(REQUIRED) do
         if card[key] == "" then return nil, "missing " .. key end
     end
     if #card.spanish == 0 then return nil, "missing spanish" end
-    local ipa = card.ipa:gsub("^/+", ""):gsub("/+$", "")
-    card.ipa = "/" .. ipa .. "/"
     return card
+end
+
+-- A reason to ask the other model, or nil.
+function Gemini.quality_problem(card, input)
+    if Text.mentions(card.definition, card.headword) then return "definition uses the headword" end
+    local sentence = Text.strip_marks(input.sentence or "")
+    if sentence ~= "" and Text.overlap(card.example, sentence) > 0.5 then return "example copies the book" end
+    return nil
 end
 
 -- The model's text from a generateContent reply, or nil plus a reason.
@@ -102,10 +111,10 @@ end
 
 function Gemini.generate(cfg, input, transport)
     local attempts = {
-        { model = cfg.gemini_model },
+        { model = cfg.gemini_model, thinking = (cfg.gemini_thinking or "") ~= "" and cfg.gemini_thinking or nil },
         { model = cfg.gemini_fallback_model, thinking = "low" },
     }
-    local result
+    local result, first_ok
     for _, attempt in ipairs(attempts) do
         if attempt.model and attempt.model ~= "" then
             local code, body = transport({
@@ -118,10 +127,16 @@ function Gemini.generate(cfg, input, transport)
             })
             result = Gemini.interpret(code, body)
             result.model = attempt.model
-            if result.ok or not result.retry then return result end
+            if result.ok then
+                result.problem = Gemini.quality_problem(result.card, input)
+                if not result.problem then return result end
+                first_ok = first_ok or result
+            elseif not result.retry then
+                return first_ok or result
+            end
         end
     end
-    return result or { ok = false, kind = "http", message = "no Gemini model configured" }
+    return first_ok or result or { ok = false, kind = "http", message = "no Gemini model configured" }
 end
 
 -- Cheap reachability and key check: fetches the primary model's description.

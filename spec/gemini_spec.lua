@@ -6,11 +6,10 @@ local cfg = Config.from_values({ GEMINI_API_KEY = "test-key" })
 local input = { word = "gave", sentence = "she finally ⟦gave⟧ it up.", book_title = "", book_author = "" }
 
 local GOOD = {
-    status = "ok", surface = "gave", expression_in_text = "gave it up", headword = "give up",
-    pos = "phrasal verb", pattern = "give sth up", register = "neutral", cefr = "B1",
-    definition = "to stop doing something", spanish = { "dejar", "abandonar" },
-    context = "she finally <b>gave it up</b>.", example = "He <b>gave up</b> smoking.",
-    collocations = { "give up hope" }, warning = "", pron_tip = "", ipa = "/ɡɪv ʌp/",
+    status = "ok", expression_in_text = "gave it up", headword = "give up", pos = "phrasal verb",
+    sense = "stopped doing it", ipa = "/ˌɡɪv ˈʌp/", pattern = "give sth up", register = "neutral",
+    definition = "to stop doing something", spanish = { "dejar", "abandonar" }, trap = "none", warning = "",
+    sound = "none", pron_tip = "", example = "He <b>gave up</b> coffee.", collocations = { "give up hope" },
 }
 
 local function reply(card)
@@ -77,6 +76,30 @@ describe("Gemini.generate", function()
         assert_eq(result.ok, false)
         assert_eq(result.kind, "quota")
     end)
+    it("retries with the fallback when the definition uses the headword", function()
+        local bad = copy(GOOD)
+        bad.definition = "to give something up"
+        local transport, calls = fake({ { 200, reply(bad) }, { 200, reply(GOOD) } })
+        local result = Gemini.generate(cfg, input, transport)
+        assert_eq(result.model, "gemini-3.6-flash")
+        assert_eq(result.card.definition, "to stop doing something")
+        assert_eq(#calls, 2)
+    end)
+    it("keeps the first card when the fallback fails", function()
+        local bad = copy(GOOD)
+        bad.example = "she finally <b>gave it up</b>."
+        local transport = fake({ { 200, reply(bad) }, { 503, "{}" } })
+        local result = Gemini.generate(cfg, input, transport)
+        assert_eq(result.ok, true)
+        assert_eq(result.model, "gemini-3.5-flash-lite")
+        assert_eq(result.problem, "example copies the book")
+    end)
+    it("sends the configured thinking level to the main model", function()
+        local thinking_cfg = Config.from_values({ GEMINI_API_KEY = "k", GEMINI_THINKING = "low" })
+        local transport, calls = fake({ { 200, reply(GOOD) } })
+        Gemini.generate(thinking_cfg, input, transport)
+        assert_eq(Json.decode(calls[1].body).generationConfig.thinkingConfig.thinkingLevel, "low")
+    end)
     it("classifies certificate failures as tls and does not retry", function()
         local transport, calls = fake({ { nil, "certificate verify failed" } })
         assert_eq(Gemini.generate(cfg, input, transport).kind, "tls")
@@ -85,15 +108,14 @@ describe("Gemini.generate", function()
 end)
 
 describe("Gemini.normalize", function()
-    it("trims strings, caps lists and adds IPA slashes", function()
+    it("trims strings and caps lists", function()
         local raw = copy(GOOD)
         raw.headword = "  give up "
-        raw.ipa = "ɡɪv ʌp"
         raw.spanish = { "a", "b", "c", "d", 5 }
         local card = Gemini.normalize(raw)
         assert_eq(card.headword, "give up")
-        assert_eq(card.ipa, "/ɡɪv ʌp/")
         assert_same(card.spanish, { "a", "b", "c" })
+        assert_eq(card.trap, "none")
     end)
     it("rejects cards without Spanish equivalents", function()
         local raw = copy(GOOD)
