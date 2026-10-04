@@ -34,15 +34,16 @@ local function sentence_end(s, from)
     end
 end
 
-local function last_sentence_start(s)
-    local start, i = 1, 1
+-- Every position where a sentence starts in s (always includes 1).
+local function sentence_starts(s)
+    local starts, i = { 1 }, 1
     while true do
         local j = sentence_end(s, i)
-        if not j then break end
-        start, i = j, j
-        if j > #s then break end
+        if not j or j > #s then break end
+        starts[#starts + 1] = j
+        i = j
     end
-    return start
+    return starts
 end
 
 local function words(s)
@@ -52,14 +53,19 @@ local function words(s)
 end
 
 -- The held word inside its sentence, marked ⟦like this⟧.
-function Context.cut_sentence(prev, word, nxt, max_side_words)
+function Context.cut_sentence(prev, word, nxt, max_side_words, min_words)
     max_side_words = max_side_words or 30
+    min_words = min_words or 6
     prev = (prev or ""):match("([^\n]*)$")
     nxt = (nxt or ""):match("^([^\n]*)")
-    prev = prev:sub(last_sentence_start(prev))
     local stop = sentence_end(nxt, 1)
     if stop then nxt = nxt:sub(1, stop - 1) end
-    prev = prev:gsub("%s+", " ")
+    local starts = sentence_starts(prev)
+    local current = prev:sub(starts[#starts])
+    if #starts > 1 and #words(current) + 1 + #words(nxt) < min_words then
+        current = prev:sub(starts[#starts - 1])
+    end
+    prev = current:gsub("%s+", " ")
     nxt = nxt:gsub("%s+", " ")
     local before = words(prev)
     if #before > max_side_words then
