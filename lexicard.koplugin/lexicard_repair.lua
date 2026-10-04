@@ -50,6 +50,8 @@ function Repair.warning(card)
     if keep then return warning, trap end
     local fallback = Traps.false_friend_warning(card.headword)
     if fallback then return fallback, "false_friend" end
+    fallback = Traps.confusable_warning(card.headword)
+    if fallback then return fallback, "confusable" end
     return "", "none"
 end
 

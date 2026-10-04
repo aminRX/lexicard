@@ -35,6 +35,35 @@ Traps.FALSE_FRIENDS = {
     carpet = { "carpeta", "alfombra" },
 }
 
+-- English pairs that share one Spanish verb: { word, partner, Spanish verb, how to tell them apart, autofill }
+-- Only pairs whose words have one main sense are filled in by code; the rest are left to the model.
+local PAIRS = {
+    { "borrow", "lend", "prestar", "borrow = pedir prestado; lend = prestar a alguien", true },
+    { "say", "tell", "decir", "tell lleva a quién (tell me); say no (say hello)", true },
+    { "make", "do", "hacer", "make = crear o producir; do = realizar una actividad", true },
+    { "hear", "listen", "oír o escuchar", "hear = percibir un sonido; listen = prestar atención", true },
+    { "rob", "steal", "robar", "rob a una persona o un lugar; steal una cosa", true },
+    { "earn", "win", "ganar", "earn = ganar con trabajo; win = ganar un juego o premio", true },
+    { "remember", "remind", "recordar", "remember = acordarse; remind = hacer que alguien recuerde", true },
+    { "see", "watch", "ver", "see = percibir con la vista; watch = mirar con atención", false },
+    { "bring", "take", "llevar o traer", "bring = hacia donde estás; take = hacia otro lugar", false },
+    { "miss", "lose", "perder", "miss = perder un bus o una oportunidad; lose = perder un objeto o un juego", false },
+}
+
+Traps.CONFUSABLES = {}
+for _, p in ipairs(PAIRS) do
+    if p[5] then
+        Traps.CONFUSABLES[p[1]] = { partner = p[2], spanish = p[3], note = p[4] }
+        Traps.CONFUSABLES[p[2]] = { partner = p[1], spanish = p[3], note = p[4] }
+    end
+end
+
+function Traps.confusable_warning(headword)
+    local entry = Traps.CONFUSABLES[Text.fold(headword)]
+    if not entry then return nil end
+    return ("En español ambos son «%s»: %s"):format(entry.spanish, entry.note)
+end
+
 Traps.PREPOSITION_ERRORS = {
     "*depend of → depend on", "*married with → married to", "*think in → think of/about",
     "*dream with → dream of", "*consist in → consist of", "*enter in → enter", "*wait the bus → wait for the bus",
@@ -91,9 +120,14 @@ function Traps.prompt_lists()
         local e = Traps.FALSE_FRIENDS[k]
         friends[#friends + 1] = ("%s ≠ %s → %s"):format(k, e[1], e[2])
     end
+    local pairs_text = {}
+    for _, p in ipairs(PAIRS) do pairs_text[#pairs_text + 1] = ("%s/%s (%s)"):format(p[1], p[2], p[3]) end
     local lines = {
         "Known false friends (English ≠ Spanish look-alike → what to say):",
         table.concat(friends, "; "),
+        "",
+        "Known confusable pairs (two English words, one Spanish word; use trap \"confusable\"):",
+        table.concat(pairs_text, "; "),
         "",
         "Known preposition and calque errors (* = wrong):",
         table.concat(Traps.PREPOSITION_ERRORS, "; "),
