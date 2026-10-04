@@ -69,9 +69,18 @@ function Text.mentions(text, headword)
     return false
 end
 
--- Share of a's content words that also appear in b (0..1).
-function Text.overlap(a, b)
-    local wa, seen = Text.content_words(a), {}
+-- Share of a's content words that also appear in b (0..1). Words of `ignore` (the headword,
+-- in any regular form) don't count, so only the rest of a sentence can copy the book.
+function Text.overlap(a, b, ignore)
+    local skip = Text.content_words(ignore or "")
+    local wa, seen = {}, {}
+    for _, w in ipairs(Text.content_words(a)) do
+        local keep = true
+        for _, base in ipairs(skip) do
+            if Text.same_family(w, base) then keep = false end
+        end
+        if keep then wa[#wa + 1] = w end
+    end
     if #wa == 0 then return 0 end
     for _, w in ipairs(Text.content_words(b)) do seen[w] = true end
     local shared = 0

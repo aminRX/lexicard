@@ -13,12 +13,15 @@ local function as_list(v)
     return { v }
 end
 
--- Capitalized words of the book sentence, except its first word and "I": likely names.
-local function book_names(sentence)
-    local names, first = {}, true
-    for word in Text.strip_marks(sentence or ""):gmatch("[%a']+") do
-        if not first and word:match("^%u") and word ~= "I" then names[word:lower()] = true end
-        first = false
+-- Capitalized words of the book sentence that don't start a sentence, other than "I" and
+-- the held word: likely names.
+local function book_names(sentence, held)
+    local names, start = {}, true
+    for word, after in Text.strip_marks(sentence or ""):gmatch("([%a']+)([^%a']*)") do
+        if not start and word:match("^%u") and word ~= "I" and word:lower() ~= (held or ""):lower() then
+            names[word:lower()] = true
+        end
+        start = after:find("[%.!?]") ~= nil
     end
     return names
 end
@@ -59,12 +62,12 @@ function Checks.run(case, result)
     for _, item in ipairs(card.usage) do
         if #Text.words(item.example) > 12 then long = item.example end
         if not item.example:find("<b>", 1, true) then plain_example = item.example end
-        if sentence ~= "" then worst = math.max(worst, Text.overlap(item.example, sentence)) end
+        if sentence ~= "" then worst = math.max(worst, Text.overlap(item.example, sentence, card.headword)) end
     end
     add("usage_short", long == nil, long)
     add("usage_bold", plain_example == nil, plain_example)
     if sentence ~= "" then add("example_new", worst <= 0.5, ("overlap %.2f"):format(worst)) end
-    local names = book_names(case.sentence)
+    local names = book_names(case.sentence, case.word)
     local leaked = false
     for _, item in ipairs(card.usage) do leaked = leaked or mentions_any(item.example, names) end
     leaked = leaked or mentions_any(card.picture_scene or "", names) or mentions_any(card.picture_caption or "", names)

@@ -34,6 +34,13 @@ describe("Checks.run", function()
         assert_same(names_failed(Checks.run(case, { ok = true, card = card })),
             { "usage_count", "example_new", "no_book_names", "caption_short" })
     end)
+    it("doesn't take a word that starts a sentence, or the held word, for a name", function()
+        local card = good_card()
+        card.usage[1].example = "Please drive <b>slowly</b> near the school."
+        local case = { word = "Slowly", sentence = "The snow fell over the quiet town. ⟦Slowly⟧.", expect = {} }
+        local failed = names_failed(Checks.run(case, { ok = true, card = card }))
+        for _, name in ipairs(failed) do assert_true(name ~= "no_book_names", "flagged a sentence start") end
+    end)
     it("expects a warning for a false friend and none otherwise", function()
         local case = { word = "realized", sentence = "", expect = { trap = "false_friend" } }
         assert_same(names_failed(Checks.run(case, { ok = true, card = good_card() })), { "warning_false_friend" })

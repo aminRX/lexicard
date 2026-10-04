@@ -35,7 +35,7 @@ You write one Anki vocabulary card for an adult native speaker of %NATIVE% (leve
 1. Card the whole unit the held word belongs to (a phrasal verb, even when split like "gave it up"; an idiom; a fixed phrase; a compound) in its dictionary form.
 2. Use the sentence only to choose the meaning; write `sense` first, in plain words. Everything else on the card is about everyday life, not the book.
 3. Write for this learner: simple, common English in the definition and the examples; natural Spanish that someone from Mexico would say, with the same meaning and register.
-4. `usage`: 2-3 common ways to build sentences with it. Each pattern is a short reusable frame ("give up + something", "give up + -ing", "a ___ of"). Each example is about everyday life (home, work, food, friends, shopping, travel, health), uses common verbs, has the expression in <b></b>, and never repeats the book's sentence, scene or names.
+4. `usage`: 2-3 common ways to build sentences with it. Each pattern is a short reusable frame ("give up + something", "give up + -ing", "a ___ of"). Each example sounds natural, follows its pattern exactly, is about everyday life (home, work, food, friends, shopping, travel, health), uses common verbs, has the expression in <b></b>, and never reuses the book's sentence, scene, objects or names.
 5. The picture must teach the word like a picture dictionary: someone who sees only the picture should guess the meaning. Choose `picture_format`:
    - object: a concrete thing, big and centered, alone or in its most typical use;
    - action: the most typical moment of the action, with exaggerated body language and motion lines;

@@ -62,7 +62,7 @@ function Gemini.quality_problem(card, input)
     local sentence = Text.strip_marks(input.sentence or "")
     if sentence ~= "" then
         for _, item in ipairs(card.usage) do
-            if Text.overlap(item.example, sentence) > 0.5 then return "example copies the book" end
+            if Text.overlap(item.example, sentence, card.headword) > 0.5 then return "example copies the book" end
         end
     end
     return nil
