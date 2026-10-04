@@ -36,6 +36,7 @@ local function happy(over)
         sync = function() return nil end,
         modelFieldNames = function() return NoteType.FIELDS end,
         modelStyling = function() return { css = NoteType.CSS } end,
+        modelTemplates = function() return { Recognize = { Front = "f", Back = "b" } } end,
     }
     for k, v in pairs(over or {}) do h[k] = v end
     return h
@@ -98,19 +99,24 @@ describe("Anki.deliver", function()
         assert_eq(Anki.deliver(transport, cfg, {}).kind, "duplicate")
         assert_eq(actions(calls)[#calls], "addNote")
     end)
-    it("migrates an old note type: adds fields, then pushes templates and CSS", function()
+    it("migrates an old note type: adds fields, retires the reverse card, pushes templates and CSS", function()
         local old = { "Headword", "POS", "Pattern", "IPA", "Spanish", "Definition", "Context", "Example", "Cloze",
-                      "Collocations", "Warning", "PronTip", "Book", "CEFR" }
-        local added = {}
+                      "Collocations", "Warning", "PronTip", "Book", "CEFR", "Register", "ContextOpen", "Audio" }
+        local added, pushed = {}, nil
         local transport, calls = fake_anki(happy({
             modelFieldNames = function() return old end,
             modelFieldAdd = function(params) added[#added + 1] = params.fieldName return nil end,
-            modelStyling = function() return { css = ".card {}" } end,
-            updateModelTemplates = function() return nil end,
+            modelStyling = function() return { css = "/* lexicard-notetype v2 */" } end,
+            modelTemplates = function() return { Recognize = { Front = "f", Back = "b" },
+                                                 Produce = { Front = "<p>{{Spanish}}</p>", Back = "x" } } end,
+            updateModelTemplates = function(params) pushed = params.model.templates return nil end,
             updateModelStyling = function() return nil end,
         }))
         assert_eq(Anki.deliver(transport, cfg, {}).kind, "ok")
-        assert_same(added, { "Register", "ContextOpen", "Audio" })
+        assert_same(added, { "Usage", "Image", "Caption" })
+        assert_eq(pushed.Produce.Front, "{{#Cloze}}<p>{{Spanish}}</p>{{/Cloze}}")
+        assert_eq(pushed.Produce.Back, nil)
+        assert_eq(pushed.Recognize.Back, NoteType.TEMPLATES[1].Back)
         local list = actions(calls)
         assert_eq(list[#list - 3], "updateModelTemplates")
         assert_eq(list[#list - 2], "updateModelStyling")
@@ -146,6 +152,25 @@ describe("Anki.deliver_many", function()
         })
         assert_eq(actions(calls)[#calls], "sync")
     end)
+    it("prepares each note after connecting and reports info and sync errors", function()
+        local sent = {}
+        local transport = fake_anki(happy({
+            addNote = function(params) sent[#sent + 1] = params.note return 1 end,
+            sync = function() return nil, "Sync status 2" end,
+        }))
+        local report = Anki.deliver_many(transport, cfg, { { id = "a", note = { fields = {} } } }, function(item)
+            return { fields = {}, picture = { { data = "P" } } }, { picture = "ok" }
+        end)
+        assert_eq(sent[1].picture[1].data, "P")
+        assert_same(report.outcomes, { { id = "a", kind = "ok", info = { picture = "ok" } } })
+        assert_eq(report.sync_error, "Sync status 2")
+    end)
+    it("does not prepare anything when Anki is unreachable", function()
+        local prepared = false
+        Anki.deliver_many(fake_anki(happy(), { unreachable = true }), cfg, { { id = "a", note = {} } },
+            function() prepared = true end)
+        assert_eq(prepared, false)
+    end)
     it("returns a setup error when Anki is unreachable", function()
         local report = Anki.deliver_many(fake_anki(happy(), { unreachable = true }), cfg, { { id = "a", note = {} } })
         assert_eq(report.setup_error.kind, "unreachable")
@@ -163,7 +188,8 @@ describe("Anki.update_note_type and Anki.check", function()
             updateModelStyling = function() return nil end,
         }))
         assert_eq(Anki.update_note_type(transport, cfg).kind, "ok")
-        assert_same(actions(calls), { "version", "deckNames", "modelNames", "modelFieldNames", "modelStyling", "updateModelTemplates", "updateModelStyling" })
+        assert_same(actions(calls), { "version", "deckNames", "modelNames", "modelFieldNames", "modelStyling",
+            "modelTemplates", "updateModelTemplates", "updateModelStyling" })
     end)
     it("checks every URL", function()
         local results = Anki.check(fake_anki(happy()), cfg)

@@ -76,6 +76,23 @@ function Anki.ensure_setup(transport, url, cfg)
     return Anki.migrate(transport, url, cfg)
 end
 
+-- Templates and CSS. An older reverse card ("Produce") stays for old notes but is no
+-- longer made for new ones (see NoteType.retire_produce).
+function Anki.push_note_type(transport, url, cfg)
+    local name = cfg.anki_note_type
+    local params = NoteType.update_templates_params(name)
+    local kind, templates = Anki.call(transport, url, cfg, "modelTemplates", { modelName = name })
+    if kind ~= "ok" then return kind, templates end
+    local produce = type(templates) == "table" and templates.Produce
+    if type(produce) == "table" and type(produce.Front) == "string" then
+        local front = NoteType.retire_produce(produce.Front)
+        if front then params.model.templates.Produce = { Front = front } end
+    end
+    kind, templates = Anki.call(transport, url, cfg, "updateModelTemplates", params)
+    if kind ~= "ok" then return kind, templates end
+    return Anki.call(transport, url, cfg, "updateModelStyling", NoteType.update_styling_params(name))
+end
+
 -- Brings an existing note type up to date: adds missing fields, and pushes templates
 -- and CSS when fields were added or the CSS lacks the current version mark.
 function Anki.migrate(transport, url, cfg)
@@ -95,9 +112,7 @@ function Anki.migrate(transport, url, cfg)
     if kind ~= "ok" then return kind, styling end
     local css = type(styling) == "table" and tostring(styling.css or "") or ""
     if changed or not css:find(NoteType.VERSION_MARK, 1, true) then
-        local k, m = Anki.call(transport, url, cfg, "updateModelTemplates", NoteType.update_templates_params(name))
-        if k ~= "ok" then return k, m end
-        k, m = Anki.call(transport, url, cfg, "updateModelStyling", NoteType.update_styling_params(name))
+        local k, m = Anki.push_note_type(transport, url, cfg)
         if k ~= "ok" then return k, m end
     end
     return "ok"
@@ -111,41 +126,42 @@ local function connect(transport, cfg)
     return url
 end
 
--- Sends one note, then syncs. Returns {kind, message}.
-function Anki.deliver(transport, cfg, note)
-    local url, failure = connect(transport, cfg)
-    if not url then return failure end
-    local kind, message = Anki.call(transport, url, cfg, "addNote", { note = note })
-    if kind ~= "ok" then return { kind = kind, message = tostring(message) } end
-    local sync_kind, sync_message = Anki.call(transport, url, cfg, "sync", nil, 30)
-    if sync_kind ~= "ok" then return { kind = "ok", sync_error = tostring(sync_message) } end
-    return { kind = "ok" }
-end
-
--- Sends queued items ({id, note}) oldest first, stopping at the first unreachable.
--- Returns {outcomes = {{id, kind, message}}, setup_error = {kind, message} or nil}.
-function Anki.deliver_many(transport, cfg, items)
+-- Sends queued items ({id, note, media}) oldest first, stopping at the first unreachable.
+-- prepare(item), called only once Anki answered, returns the note to send (with media) and
+-- an info table copied into the outcome.
+-- Returns {outcomes = {{id, kind, message, info}}, setup_error = {kind, message} or nil, sync_error = string or nil}.
+function Anki.deliver_many(transport, cfg, items, prepare)
     local url, failure = connect(transport, cfg)
     if not url then return { outcomes = {}, setup_error = failure } end
     local outcomes, sent = {}, 0
     for _, item in ipairs(items) do
-        local kind, message = Anki.call(transport, url, cfg, "addNote", { note = item.note })
-        outcomes[#outcomes + 1] = { id = item.id, kind = kind, message = kind ~= "ok" and tostring(message) or nil }
+        local note, info = item.note, nil
+        if prepare then note, info = prepare(item) end
+        local kind, message = Anki.call(transport, url, cfg, "addNote", { note = note }, 30)
+        outcomes[#outcomes + 1] = { id = item.id, kind = kind, message = kind ~= "ok" and tostring(message) or nil, info = info }
         if kind == "ok" then sent = sent + 1 end
         if kind == "unreachable" then break end
     end
-    if sent > 0 then Anki.call(transport, url, cfg, "sync", nil, 30) end
-    return { outcomes = outcomes }
+    local report = { outcomes = outcomes }
+    if sent > 0 then
+        local sync_kind, sync_message = Anki.call(transport, url, cfg, "sync", nil, 30)
+        if sync_kind ~= "ok" then report.sync_error = tostring(sync_message) end
+    end
+    return report
+end
+
+-- One note (scripts): {kind, message, sync_error}.
+function Anki.deliver(transport, cfg, note)
+    local report = Anki.deliver_many(transport, cfg, { { id = "1", note = note } })
+    if report.setup_error then return report.setup_error end
+    local outcome = report.outcomes[1]
+    return { kind = outcome.kind, message = outcome.message, sync_error = report.sync_error }
 end
 
 function Anki.update_note_type(transport, cfg)
     local url, failure = connect(transport, cfg)
     if not url then return failure end
-    local kind, message = Anki.call(transport, url, cfg, "updateModelTemplates",
-        NoteType.update_templates_params(cfg.anki_note_type))
-    if kind ~= "ok" then return { kind = kind, message = tostring(message) } end
-    kind, message = Anki.call(transport, url, cfg, "updateModelStyling",
-        NoteType.update_styling_params(cfg.anki_note_type))
+    local kind, message = Anki.push_note_type(transport, url, cfg)
     if kind ~= "ok" then return { kind = kind, message = tostring(message) } end
     return { kind = "ok" }
 end
