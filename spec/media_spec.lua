@@ -37,6 +37,16 @@ describe("Media", function()
         assert_eq(note.audio, nil)
         assert_eq(note.picture, nil)
     end)
+    it("says why the audio is missing", function()
+        local quota = function(request)
+            if request.url:find("cloudflare", 1, true) then return 200, Json.encode({ result = { image = "/9j/PIC" } }) end
+            return 429, "{}"
+        end
+        local out, info = Media.attach(on, quota, { fields = {} }, Media.request(card, on))
+        assert_eq(out.audio, nil)
+        assert_eq(info.audio, "daily voice limit reached")
+        assert_eq(info.picture, "ok")
+    end)
     it("sends without a picture when Cloudflare fails or pictures are off", function()
         local note = { fields = {} }
         local out, info = Media.attach(on, transport({ picture_down = true }), note, Media.request(card, on))

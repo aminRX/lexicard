@@ -122,6 +122,7 @@ describe("Lexicard plugin (fake KOReader)", function()
         hold_and_save(ui)
         assert_eq(#state.notes, 1)
         assert_eq(state.notes[1].audio, nil)
+        assert_match(Fake.last("info").text, "No audio: voice error %(HTTP 500%)")
     end)
     it("keeps only the card text on the Kindle when Anki is unreachable", function()
         local state = { anki_down = true }

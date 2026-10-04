@@ -37,7 +37,9 @@ function Audio.generate(cfg, text, transport)
         block_timeout = 10,
         total_timeout = 15,
     })
-    if code ~= 200 then return nil, "TTS HTTP " .. tostring(code) end
+    if type(code) ~= "number" then return nil, "network error" end
+    if code == 429 then return nil, "daily voice limit reached" end
+    if code ~= 200 then return nil, "voice error (HTTP " .. code .. ")" end
     local data = Json.decode(body)
     local candidate = type(data) == "table" and type(data.candidates) == "table" and data.candidates[1]
     local parts = type(candidate) == "table" and type(candidate.content) == "table" and candidate.content.parts

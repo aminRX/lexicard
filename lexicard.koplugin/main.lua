@@ -184,12 +184,13 @@ function Lexicard:afterSend(items, report, silent)
     end
     local by_id = {}
     for _, item in ipairs(items) do by_id[item.id] = item end
-    local no_picture, other_duplicates, busy = nil, {}, false
+    local no_picture, no_audio, other_duplicates, busy = nil, nil, {}, false
     for _, o in ipairs(report.outcomes) do
         local item = by_id[o.id]
         if o.kind == "busy" then busy = true end
-        if o.kind == "ok" and type(o.info) == "table" and o.info.picture ~= "ok" and o.info.picture ~= "none" then
-            no_picture = no_picture or o.info.picture
+        if o.kind == "ok" and type(o.info) == "table" then
+            if o.info.picture ~= "ok" and o.info.picture ~= "none" then no_picture = no_picture or o.info.picture end
+            if o.info.audio ~= "ok" and o.info.audio ~= "none" then no_audio = no_audio or o.info.audio end
         end
         if o.kind == "duplicate" and item then
             if self.interactive[o.id] then
@@ -209,6 +210,7 @@ function Lexicard:afterSend(items, report, silent)
         lines[#lines + 1] = T(_("Added %1 cards to %2 ✓"), summary.sent, cfg.anki_deck)
     end
     if no_picture then lines[#lines + 1] = T(_("No picture: %1."), no_picture) end
+    if no_audio then lines[#lines + 1] = T(_("No audio: %1."), no_audio) end
     if report.sync_error then
         logger.warn("Lexicard: AnkiConnect sync failed", report.sync_error)
         lines[#lines + 1] = _("But Anki couldn't sync to AnkiWeb: open Anki on the computer and press Sync (it may ask for a full sync).")
@@ -225,7 +227,8 @@ function Lexicard:afterSend(items, report, silent)
         lines[#lines + 1] = T(WAITING, summary.remaining)
     end
     if #lines > 0 and (loud or summary.sent > 0) then
-        UI.info(table.concat(lines, "\n"), (summary.failed == 0 and not report.sync_error and not no_picture) and 3 or nil)
+        local clean = summary.failed == 0 and not report.sync_error and not no_picture and not no_audio
+        UI.info(table.concat(lines, "\n"), clean and 3 or nil)
     end
     if busy then self:retrySoon() end
 end
