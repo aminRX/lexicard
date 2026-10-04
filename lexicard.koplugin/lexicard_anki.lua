@@ -117,7 +117,8 @@ function Anki.deliver(transport, cfg, note)
     if not url then return failure end
     local kind, message = Anki.call(transport, url, cfg, "addNote", { note = note })
     if kind ~= "ok" then return { kind = kind, message = tostring(message) } end
-    Anki.call(transport, url, cfg, "sync", nil, 30)
+    local sync_kind, sync_message = Anki.call(transport, url, cfg, "sync", nil, 30)
+    if sync_kind ~= "ok" then return { kind = "ok", sync_error = tostring(sync_message) } end
     return { kind = "ok" }
 end
 

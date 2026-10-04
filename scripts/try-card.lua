@@ -2,6 +2,7 @@
 -- Usage: luajit scripts/try-card.lua WORD "SENTENCE with ⟦WORD⟧" ["Title — Author"] [--send] [--deck NAME]
 package.path = "lexicard.koplugin/?.lua;spec/support/?.lua;scripts/lib/?.lua;" .. package.path
 local Anki = require("lexicard_anki")
+local Audio = require("lexicard_audio")
 local Config = require("lexicard_config")
 local Curl = require("curl_transport")
 local Gemini = require("lexicard_gemini")
@@ -43,7 +44,9 @@ card = Pipeline.finish(card, input, "lexicard.koplugin/data/cmudict-ipa.tsv")
 print("model: " .. result.model)
 print(Note.preview_text(card, input, cfg.anki_deck))
 if send then
-    local outcome = Anki.deliver(Curl.transport, cfg, Note.build(card, input, cfg, false))
+    local audio, why = Audio.generate(cfg, card, Curl.transport)
+    print("audio: " .. (audio and (#audio .. " base64 bytes") or ("none (" .. tostring(why) .. ")")))
+    local outcome = Anki.deliver(Curl.transport, cfg, Note.build(card, input, cfg, false, audio))
     print("anki: " .. outcome.kind .. (outcome.message and (" — " .. outcome.message) or ""))
     if outcome.kind ~= "ok" then os.exit(1) end
 end

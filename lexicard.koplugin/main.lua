@@ -130,7 +130,12 @@ function Lexicard:save(card, input, allow_duplicate)
         if not completed or type(outcome) ~= "table" then
             self:keepOnKindle(note)
         elseif outcome.kind == "ok" then
-            UI.info(T(_("Added to %1 ✓"), cfg.anki_deck), 2)
+            if outcome.sync_error then
+                logger.warn("Lexicard: AnkiConnect sync failed", outcome.sync_error)
+                UI.info(T(_("Added to %1 ✓\nBut Anki couldn't sync to AnkiWeb: open Anki on the computer and press Sync (it may ask for a full sync)."), cfg.anki_deck))
+            else
+                UI.info(T(_("Added to %1 ✓"), cfg.anki_deck), 2)
+            end
             if self.outbox:count() > 0 then self:flushOutbox(true) end
         elseif outcome.kind == "duplicate" then
             UI.confirm(_("Already in your deck. Add anyway?"), _("Add anyway"), function()

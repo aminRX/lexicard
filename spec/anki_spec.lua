@@ -83,6 +83,14 @@ describe("Anki.deliver", function()
         assert_eq(Anki.deliver(transport, cfg, {}).kind, "ok")
         assert_same(actions(calls), { "version", "deckNames", "createDeck", "modelNames", "createModel", "addNote", "sync" })
     end)
+    it("passes on a failed sync as a warning, keeping the add a success", function()
+        local transport = fake_anki(happy({
+            sync = function() return nil, "Sync status 2 not one of [0, 1] - see SyncCollectionResponse.ChangesRequired" end,
+        }))
+        local outcome = Anki.deliver(transport, cfg, {})
+        assert_eq(outcome.kind, "ok")
+        assert_match(outcome.sync_error, "Sync status 2")
+    end)
     it("reports duplicates without syncing", function()
         local transport, calls = fake_anki(happy({
             addNote = function() return nil, "cannot create note because it is a duplicate" end,

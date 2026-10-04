@@ -31,6 +31,9 @@ local function transport_for(state)
         local NoteType = require("lexicard_notetype")
         local results = { version = 6, deckNames = { "Reading vocabulary" }, modelNames = { "Lexicard" }, addNote = 1,
                           modelFieldNames = NoteType.FIELDS, modelStyling = { css = NoteType.CSS } }
+        if req.action == "sync" and state.sync_error then
+            return 200, Json.encode({ result = Json.null, error = state.sync_error })
+        end
         return 200, Json.encode({ result = results[req.action] or Json.null, error = Json.null })
     end
 end
@@ -79,6 +82,13 @@ describe("Lexicard plugin (fake KOReader)", function()
         assert_eq(state.notes[1].audio[1].data, "UklGRg==")
         assert_eq(state.actions[#state.actions], "sync")
         assert_match(Fake.last("info").text, "Added to Reading vocabulary")
+    end)
+    it("says so when Anki needs a full sync", function()
+        local state = { sync_error = "Sync status 2 not one of [0, 1]" }
+        local _, ui = setup(state)
+        hold_and_save(ui)
+        assert_eq(#state.notes, 1)
+        assert_match(Fake.last("info").text, "full sync")
     end)
     it("saves without audio when the voice fails", function()
         local state = { tts_down = true }
