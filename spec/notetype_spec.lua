@@ -4,9 +4,9 @@ local Config = require("lexicard_config")
 
 describe("NoteType", function()
     it("declares exactly the fields Note.build fills, Headword first", function()
-        local empty = { status = "ok", surface = "", expression_in_text = "", headword = "x", pos = "", pattern = "",
-            register = "", cefr = "", definition = "", spanish = {}, context = "", example = "", collocations = {},
-            warning = "", pron_tip = "", ipa = "" }
+        local empty = { status = "ok", expression_in_text = "", headword = "x", pos = "", sense = "", pattern = "",
+            register = "", definition = "", spanish = {}, trap = "none", warning = "", sound = "none", pron_tip = "",
+            example = "", collocations = {}, ipa = "" }
         local note = Note.build(empty, { book_title = "", book_author = "" }, Config.from_values({}))
         local filled = {}
         for name in pairs(note.fields) do filled[#filled + 1] = name end
@@ -28,6 +28,9 @@ describe("NoteType", function()
                 end
             end
         end
+    end)
+    it("marks the CSS with the template version", function()
+        assert_true(NoteType.CSS:find(NoteType.VERSION_MARK, 1, true) ~= nil)
     end)
     it("builds AnkiConnect parameters", function()
         local params = NoteType.create_model_params("Lexicard")

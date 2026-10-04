@@ -1,57 +1,62 @@
 --[[
 The "Lexicard" Anki note type: two cards per note (Recognize, Produce).
-Anki's {{tts en_US:Headword}} gives audio on the review device.
+New fields are appended at the end so old note types can be migrated in place.
 ]]
 local NoteType = {}
 
+NoteType.VERSION_MARK = "lexicard-notetype v2"
+
 NoteType.FIELDS = { "Headword", "POS", "Pattern", "IPA", "Spanish", "Definition", "Context", "Example",
-                    "Cloze", "Collocations", "Warning", "PronTip", "Book", "CEFR" }
+                    "Cloze", "Collocations", "Warning", "PronTip", "Book", "CEFR",
+                    "Register", "ContextOpen", "Audio" }
+
+local META = [=[<div class="lx-meta">{{#IPA}}<span>{{IPA}}</span>{{/IPA}}{{#POS}}<span>{{POS}}</span>{{/POS}}{{#Pattern}}<span>{{Pattern}}</span>{{/Pattern}}{{#Register}}<span>{{Register}}</span>{{/Register}}</div>]=]
 
 NoteType.TEMPLATES = {
     {
         Name = "Recognize",
         Front = [=[<div class="lx">
-{{#Context}}<div class="lx-context">{{Context}}</div>{{/Context}}
 <div class="lx-headword">{{Headword}}</div>
-<div class="lx-audio">{{tts en_US:Headword}}</div>
+<div class="lx-audio">{{Audio}}</div>
+{{#Context}}{{#ContextOpen}}<div class="lx-context">{{Context}}</div>{{/ContextOpen}}{{^ContextOpen}}<div class="lx-hint">{{hint:Context}}</div>{{/ContextOpen}}{{/Context}}
 </div>]=],
         Back = [=[{{FrontSide}}
 <hr id="answer">
 <div class="lx">
-<div class="lx-meta">{{IPA}} · {{POS}}{{#Pattern}} · {{Pattern}}{{/Pattern}}{{#CEFR}} · {{CEFR}}{{/CEFR}}</div>
 <div class="lx-spanish">{{Spanish}}</div>
 <div class="lx-definition">{{Definition}}</div>
+]=] .. META .. [=[
+
 {{#Warning}}<div class="lx-warning">⚠️ {{Warning}}</div>{{/Warning}}
-<div class="lx-example">{{Example}}</div>
-{{#Collocations}}<div class="lx-small">{{Collocations}}</div>{{/Collocations}}
 {{#PronTip}}<div class="lx-small">🗣 {{PronTip}}</div>{{/PronTip}}
+{{#Context}}{{^ContextOpen}}<div class="lx-context">{{Context}}</div>{{/ContextOpen}}{{/Context}}
 {{#Book}}<div class="lx-book">{{Book}}</div>{{/Book}}
 </div>]=],
     },
     {
         Name = "Produce",
         Front = [=[<div class="lx">
-<div class="lx-prompt">In English?</div>
+<div class="lx-prompt">Say it in English</div>
 <div class="lx-spanish">{{Spanish}}</div>
 <div class="lx-definition">{{Definition}}</div>
-<div class="lx-meta">{{POS}}</div>
+<div class="lx-meta"><span>{{POS}}</span>{{#Register}}<span>{{Register}}</span>{{/Register}}</div>
 {{#Cloze}}<div class="lx-example">{{Cloze}}</div>{{/Cloze}}
 </div>]=],
         Back = [=[{{FrontSide}}
 <hr id="answer">
 <div class="lx">
 <div class="lx-headword">{{Headword}}</div>
-<div class="lx-meta">{{IPA}}{{#Pattern}} · {{Pattern}}{{/Pattern}}</div>
-<div class="lx-audio">{{tts en_US:Headword}}</div>
+<div class="lx-audio">{{Audio}}</div>
+<div class="lx-meta">{{#IPA}}<span>{{IPA}}</span>{{/IPA}}{{#Pattern}}<span>{{Pattern}}</span>{{/Pattern}}</div>
 <div class="lx-example">{{Example}}</div>
-{{#Context}}<div class="lx-context">{{Context}}</div>{{/Context}}
+{{#Collocations}}<div class="lx-small">{{Collocations}}</div>{{/Collocations}}
 {{#Warning}}<div class="lx-warning">⚠️ {{Warning}}</div>{{/Warning}}
-{{#Book}}<div class="lx-book">{{Book}}</div>{{/Book}}
+{{#PronTip}}<div class="lx-small">🗣 {{PronTip}}</div>{{/PronTip}}
 </div>]=],
     },
 }
 
-NoteType.CSS = [=[.card {
+NoteType.CSS = "/* " .. NoteType.VERSION_MARK .. " */\n" .. [=[.card {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 20px;
   line-height: 1.45;
@@ -63,7 +68,10 @@ NoteType.CSS = [=[.card {
 .lx-headword { font-size: 1.6em; font-weight: 700; margin: 0.3em 0; }
 .lx-context { font-family: Georgia, "Times New Roman", serif; font-size: 1.05em; margin: 0.6em 0; }
 .lx-context b, .lx-example b { color: #b3261e; }
+.lx-hint { margin: 0.6em 0; font-size: 0.85em; }
+.lx-hint a { color: #8e8e93; }
 .lx-meta { color: #6e6e73; font-size: 0.85em; margin: 0.2em 0; }
+.lx-meta span + span::before { content: " · "; }
 .lx-spanish { font-size: 1.2em; font-weight: 600; margin-top: 0.6em; }
 .lx-definition { margin: 0.3em 0 0.6em; }
 .lx-example { font-style: italic; margin: 0.5em 0; }

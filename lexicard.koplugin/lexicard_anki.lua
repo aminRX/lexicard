@@ -71,7 +71,33 @@ function Anki.ensure_setup(transport, url, cfg)
     kind, models = Anki.call(transport, url, cfg, "modelNames")
     if kind ~= "ok" then return kind, models end
     if not contains(models, cfg.anki_note_type) then
-        local k, m = Anki.call(transport, url, cfg, "createModel", NoteType.create_model_params(cfg.anki_note_type))
+        return Anki.call(transport, url, cfg, "createModel", NoteType.create_model_params(cfg.anki_note_type))
+    end
+    return Anki.migrate(transport, url, cfg)
+end
+
+-- Brings an existing note type up to date: adds missing fields, and pushes templates
+-- and CSS when fields were added or the CSS lacks the current version mark.
+function Anki.migrate(transport, url, cfg)
+    local name = cfg.anki_note_type
+    local kind, fields = Anki.call(transport, url, cfg, "modelFieldNames", { modelName = name })
+    if kind ~= "ok" then return kind, fields end
+    local changed = false
+    for _, field in ipairs(NoteType.FIELDS) do
+        if not contains(fields, field) then
+            local k, m = Anki.call(transport, url, cfg, "modelFieldAdd", { modelName = name, fieldName = field })
+            if k ~= "ok" then return k, m end
+            changed = true
+        end
+    end
+    local styling
+    kind, styling = Anki.call(transport, url, cfg, "modelStyling", { modelName = name })
+    if kind ~= "ok" then return kind, styling end
+    local css = type(styling) == "table" and tostring(styling.css or "") or ""
+    if changed or not css:find(NoteType.VERSION_MARK, 1, true) then
+        local k, m = Anki.call(transport, url, cfg, "updateModelTemplates", NoteType.update_templates_params(name))
+        if k ~= "ok" then return k, m end
+        k, m = Anki.call(transport, url, cfg, "updateModelStyling", NoteType.update_styling_params(name))
         if k ~= "ok" then return k, m end
     end
     return "ok"

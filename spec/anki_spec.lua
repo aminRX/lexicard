@@ -1,6 +1,7 @@
 local Json = require("lexicard_json")
 local Anki = require("lexicard_anki")
 local Config = require("lexicard_config")
+local NoteType = require("lexicard_notetype")
 
 local cfg = Config.from_values({ ANKICONNECT_URLS = "http://mac:8765", ANKICONNECT_API_KEY = "secret" })
 
@@ -33,6 +34,8 @@ local function happy(over)
         modelNames = function() return { "Basic", "Lexicard" } end,
         addNote = function() return 1791059962744 end,
         sync = function() return nil end,
+        modelFieldNames = function() return NoteType.FIELDS end,
+        modelStyling = function() return { css = NoteType.CSS } end,
     }
     for k, v in pairs(over or {}) do h[k] = v end
     return h
@@ -64,7 +67,7 @@ describe("Anki.deliver", function()
     it("adds the note and syncs", function()
         local transport, calls = fake_anki(happy())
         assert_eq(Anki.deliver(transport, cfg, { fields = { Headword = "give up" } }).kind, "ok")
-        assert_same(actions(calls), { "version", "deckNames", "modelNames", "addNote", "sync" })
+        assert_same(actions(calls), { "version", "deckNames", "modelNames", "modelFieldNames", "modelStyling", "addNote", "sync" })
         assert_eq(calls[1].key, "secret")
     end)
     it("creates the deck and note type when missing", function()
@@ -86,6 +89,23 @@ describe("Anki.deliver", function()
         }))
         assert_eq(Anki.deliver(transport, cfg, {}).kind, "duplicate")
         assert_eq(actions(calls)[#calls], "addNote")
+    end)
+    it("migrates an old note type: adds fields, then pushes templates and CSS", function()
+        local old = { "Headword", "POS", "Pattern", "IPA", "Spanish", "Definition", "Context", "Example", "Cloze",
+                      "Collocations", "Warning", "PronTip", "Book", "CEFR" }
+        local added = {}
+        local transport, calls = fake_anki(happy({
+            modelFieldNames = function() return old end,
+            modelFieldAdd = function(params) added[#added + 1] = params.fieldName return nil end,
+            modelStyling = function() return { css = ".card {}" } end,
+            updateModelTemplates = function() return nil end,
+            updateModelStyling = function() return nil end,
+        }))
+        assert_eq(Anki.deliver(transport, cfg, {}).kind, "ok")
+        assert_same(added, { "Register", "ContextOpen", "Audio" })
+        local list = actions(calls)
+        assert_eq(list[#list - 3], "updateModelTemplates")
+        assert_eq(list[#list - 2], "updateModelStyling")
     end)
     it("reports unreachable when no URL answers", function()
         local transport = fake_anki(happy(), { unreachable = true })
@@ -135,7 +155,7 @@ describe("Anki.update_note_type and Anki.check", function()
             updateModelStyling = function() return nil end,
         }))
         assert_eq(Anki.update_note_type(transport, cfg).kind, "ok")
-        assert_same(actions(calls), { "version", "deckNames", "modelNames", "updateModelTemplates", "updateModelStyling" })
+        assert_same(actions(calls), { "version", "deckNames", "modelNames", "modelFieldNames", "modelStyling", "updateModelTemplates", "updateModelStyling" })
     end)
     it("checks every URL", function()
         local results = Anki.check(fake_anki(happy()), cfg)
