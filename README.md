@@ -2,6 +2,8 @@
 
 A KOReader plugin for learning English while you read. Hold a word, tap **Lexicard** in the dictionary popup, and Google Gemini writes a vocabulary card for that word *as it's used in your book*. After a quick preview, the card goes to your Anki deck through AnkiConnect, and Anki's sync takes it to your phone.
 
+https://github.com/user-attachments/assets/1b348b2b-cc68-4b45-adc9-8850c332711b
+
 The cards are written for native Spanish speakers (B1–B2) by default. Hold "gave" in *"…she finally gave it up."* and you get:
 
 ```
