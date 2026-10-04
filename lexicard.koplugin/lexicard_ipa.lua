@@ -2,6 +2,8 @@
 Looks words up in data/cmudict-ipa.tsv ("word<TAB>ipa1|ipa2", sorted by byte)
 with a binary search, so the 3.5 MB file is never loaded into memory.
 ]]
+local Text = require("lexicard_text")
+
 local Ipa = {}
 
 function Ipa.lookup(path, word)
@@ -32,27 +34,8 @@ function Ipa.lookup(path, word)
     return found
 end
 
-local function chars(s)
-    local list = {}
-    for ch in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do list[#list + 1] = ch end
-    return list
-end
-
 -- Edit distance between two UTF-8 strings, counted in characters.
-function Ipa.distance(a, b)
-    local x, y = chars(a), chars(b)
-    local prev = {}
-    for j = 0, #y do prev[j] = j end
-    for i = 1, #x do
-        local cur = { [0] = i }
-        for j = 1, #y do
-            local cost = x[i] == y[j] and 0 or 1
-            cur[j] = math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
-        end
-        prev = cur
-    end
-    return prev[#y]
-end
+Ipa.distance = Text.distance
 
 -- Drops slashes, stress and length marks and unifies spellings of the same sound
 -- (ɹ/r, ɚ/ər, ɝ/ɜr, ɡ/g), so variants compare by sound.

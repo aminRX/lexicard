@@ -5,8 +5,8 @@ local Anki = require("lexicard_anki")
 local Config = require("lexicard_config")
 local Curl = require("curl_transport")
 local Gemini = require("lexicard_gemini")
-local Ipa = require("lexicard_ipa")
 local Note = require("lexicard_note")
+local Pipeline = require("lexicard_pipeline")
 
 local positional, send, deck = {}, false, nil
 local i = 1
@@ -39,7 +39,7 @@ if not result.ok then
     os.exit(1)
 end
 local card = result.card
-card.ipa = Ipa.for_headword("lexicard.koplugin/data/cmudict-ipa.tsv", card.headword, card.ipa) or card.ipa
+card = Pipeline.finish(card, input, "lexicard.koplugin/data/cmudict-ipa.tsv")
 print("model: " .. result.model)
 print(Note.preview_text(card, input, cfg.anki_deck))
 if send then
