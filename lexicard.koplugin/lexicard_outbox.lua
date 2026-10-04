@@ -1,5 +1,6 @@
 --[[
-Notes waiting for Anki, saved as a JSON array. Writes go to a temporary file
+Notes waiting for Anki, saved as a JSON array: text only, plus a small media request
+(no audio or pictures are ever stored on the Kindle). Writes go to a temporary file
 that is then renamed, so a crash or flat battery can't leave half a file.
 ]]
 local Json = require("lexicard_json")
@@ -51,13 +52,20 @@ end
 
 local counter = 0
 
-function Outbox:add(note, now)
+local MEDIA_KEYS = { audio = true, picture = true, video = true }
+
+function Outbox:add(note, now, media)
     counter = counter + 1
     now = now or os.time()
+    local text_only = {}
+    for k, v in pairs(note) do
+        if not MEDIA_KEYS[k] then text_only[k] = v end
+    end
     local item = {
         id = ("%d-%d-%d"):format(now, counter, math.random(1000000)),
         created_at = now,
-        note = note,
+        note = text_only,
+        media = media,
         attempts = 0,
         last_error = "",
     }
@@ -76,12 +84,14 @@ function Outbox:apply(outcomes)
     for _, o in ipairs(outcomes or {}) do
         if o.id then by_id[o.id] = o end
     end
-    local summary = { sent = 0, duplicates = {}, failed = 0, remaining = 0 }
+    local summary = { sent = 0, sent_words = {}, duplicates = {}, failed = 0, remaining = 0, last_error = nil }
     local keep = {}
     for _, item in ipairs(self.items) do
         local o = by_id[item.id]
         if o and o.kind == "ok" then
             summary.sent = summary.sent + 1
+            local fields = type(item.note.fields) == "table" and item.note.fields or {}
+            summary.sent_words[#summary.sent_words + 1] = fields.Headword or "?"
         elseif o and o.kind == "duplicate" then
             local fields = type(item.note.fields) == "table" and item.note.fields or {}
             summary.duplicates[#summary.duplicates + 1] = fields.Headword or "?"
@@ -90,6 +100,7 @@ function Outbox:apply(outcomes)
                 item.attempts = (item.attempts or 0) + 1
                 item.last_error = o.message or o.kind
                 summary.failed = summary.failed + 1
+                summary.last_error = item.last_error
             end
             keep[#keep + 1] = item
         end
