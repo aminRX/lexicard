@@ -4,7 +4,7 @@
 --  3. Rebuilds each note that has no picture: usage, caption, definition, Spanish, warning,
 --     plus a picture (and audio if it had none).
 -- Usage: luajit scripts/upgrade-v0.3.lua [--dry-run] [--keep-produce]
-package.path = "lexicard.koplugin/?.lua;scripts/lib/?.lua;" .. package.path
+package.path = "lexicard.koplugin/?.lua;spec/support/?.lua;scripts/lib/?.lua;" .. package.path
 local Anki = require("lexicard_anki")
 local Config = require("lexicard_config")
 local Curl = require("curl_transport")
