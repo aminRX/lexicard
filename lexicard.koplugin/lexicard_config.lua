@@ -14,6 +14,8 @@ Config.DEFAULTS = {
     AUDIO = "word",
     TTS_MODEL = "gemini-3.8-flash-lite-tts",
     TTS_VOICE = "Kore",
+    IMAGES = "on",
+    IMAGE_MODEL = "@cf/black-forest-labs/flux-2-klein-4b",
 }
 
 local function trim(s)
@@ -69,6 +71,10 @@ function Config.from_values(values)
         audio = AUDIO_MODES[v.AUDIO:lower()] and v.AUDIO:lower() or "word",
         tts_model = v.TTS_MODEL,
         tts_voice = v.TTS_VOICE,
+        cloudflare_account_id = v.CLOUDFLARE_ACCOUNT_ID or "",
+        cloudflare_api_token = v.CLOUDFLARE_API_TOKEN or "",
+        images = v.IMAGES:lower() ~= "off",
+        image_model = v.IMAGE_MODEL,
     }
 end
 
@@ -86,6 +92,11 @@ function Config.missing(cfg)
     if cfg.gemini_api_key == "" then missing[#missing + 1] = "GEMINI_API_KEY" end
     if #cfg.ankiconnect_urls == 0 then missing[#missing + 1] = "ANKICONNECT_URLS" end
     return missing
+end
+
+-- Pictures need both Cloudflare values, and IMAGES not set to off.
+function Config.pictures_enabled(cfg)
+    return cfg.images == true and (cfg.cloudflare_account_id or "") ~= "" and (cfg.cloudflare_api_token or "") ~= ""
 end
 
 return Config
