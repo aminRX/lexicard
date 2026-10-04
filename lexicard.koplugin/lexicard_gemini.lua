@@ -11,9 +11,10 @@ local Gemini = {}
 
 Gemini.BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/"
 
-local TEXT_FIELDS = { "expression_in_text", "headword", "pos", "sense", "ipa", "pattern", "register",
-                      "definition", "trap", "warning", "sound", "pron_tip", "example" }
-local REQUIRED = { "headword", "definition", "example" }
+local TEXT_FIELDS = { "expression_in_text", "headword", "pos", "sense", "ipa", "register", "definition",
+                      "trap", "warning", "picture_format", "picture_scene", "picture_caption" }
+local REQUIRED = { "headword", "definition" }
+local PICTURE_FORMATS = { object = true, action = true, before_after = true, contrast = true, manner = true }
 local STATUS_KINDS = { [408] = "busy", [429] = "quota", [500] = "busy", [502] = "busy", [503] = "busy", [504] = "busy" }
 
 local function trim(s)
@@ -27,24 +28,31 @@ function Gemini.normalize(raw)
     for _, key in ipairs(TEXT_FIELDS) do
         card[key] = type(raw[key]) == "string" and trim(raw[key]) or ""
     end
-    local function list(key, max)
-        local out = {}
-        if type(raw[key]) == "table" then
-            for _, item in ipairs(raw[key]) do
-                if type(item) == "string" and trim(item) ~= "" and #out < max then out[#out + 1] = trim(item) end
+    card.spanish = {}
+    if type(raw.spanish) == "table" then
+        for _, item in ipairs(raw.spanish) do
+            if type(item) == "string" and trim(item) ~= "" and #card.spanish < 3 then card.spanish[#card.spanish + 1] = trim(item) end
+        end
+    end
+    card.usage = {}
+    if type(raw.usage) == "table" then
+        for _, item in ipairs(raw.usage) do
+            if type(item) == "table" and type(item.example) == "string" and trim(item.example) ~= "" and #card.usage < 3 then
+                card.usage[#card.usage + 1] = {
+                    pattern = type(item.pattern) == "string" and trim(item.pattern) or "",
+                    example = trim(item.example),
+                }
             end
         end
-        return out
     end
-    card.spanish = list("spanish", 3)
-    card.collocations = list("collocations", 3)
     if card.trap == "" then card.trap = "none" end
-    if card.sound == "" then card.sound = "none" end
+    if not PICTURE_FORMATS[card.picture_format] then card.picture_format = "object" end
     if card.status ~= "ok" then return card end
     for _, key in ipairs(REQUIRED) do
         if card[key] == "" then return nil, "missing " .. key end
     end
     if #card.spanish == 0 then return nil, "missing spanish" end
+    if #card.usage == 0 then return nil, "missing usage" end
     return card
 end
 
@@ -52,7 +60,11 @@ end
 function Gemini.quality_problem(card, input)
     if Text.mentions(card.definition, card.headword) then return "definition uses the headword" end
     local sentence = Text.strip_marks(input.sentence or "")
-    if sentence ~= "" and Text.overlap(card.example, sentence) > 0.5 then return "example copies the book" end
+    if sentence ~= "" then
+        for _, item in ipairs(card.usage) do
+            if Text.overlap(item.example, sentence) > 0.5 then return "example copies the book" end
+        end
+    end
     return nil
 end
 

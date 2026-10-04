@@ -7,9 +7,10 @@ local input = { word = "gave", sentence = "she finally ⟦gave⟧ it up.", book_
 
 local GOOD = {
     status = "ok", expression_in_text = "gave it up", headword = "give up", pos = "phrasal verb",
-    sense = "stopped doing it", ipa = "/ˌɡɪv ˈʌp/", pattern = "give sth up", register = "neutral",
+    sense = "stopped doing it", ipa = "/ˌɡɪv ˈʌp/", register = "neutral",
     definition = "to stop doing something", spanish = { "dejar", "abandonar" }, trap = "none", warning = "",
-    sound = "none", pron_tip = "", example = "He <b>gave up</b> coffee.", collocations = { "give up hope" },
+    usage = { { pattern = "give up + something", example = "He <b>gave up</b> coffee." } },
+    picture_format = "before_after", picture_scene = "Two panels.", picture_caption = "He <b>gave up</b> coffee.",
 }
 
 local function reply(card)
@@ -87,7 +88,7 @@ describe("Gemini.generate", function()
     end)
     it("keeps the first card when the fallback fails", function()
         local bad = copy(GOOD)
-        bad.example = "she finally <b>gave it up</b>."
+        bad.usage = { { pattern = "", example = "she finally <b>gave it up</b>." } }
         local transport = fake({ { 200, reply(bad) }, { 503, "{}" } })
         local result = Gemini.generate(cfg, input, transport)
         assert_eq(result.ok, true)
@@ -128,6 +129,24 @@ describe("Gemini.normalize", function()
         local raw = copy(GOOD)
         raw.warning = Json.null
         assert_eq(Gemini.normalize(raw).warning, "")
+    end)
+    it("keeps up to three usage items with an example", function()
+        local raw = copy(GOOD)
+        raw.usage = { { pattern = " p ", example = " a " }, { pattern = "x" }, "junk",
+                      { example = "b" }, { example = "c" }, { example = "d" } }
+        local card = Gemini.normalize(raw)
+        assert_same(card.usage, { { pattern = "p", example = "a" }, { pattern = "", example = "b" },
+                                  { pattern = "", example = "c" } })
+    end)
+    it("rejects a card without usage and fixes an unknown picture format", function()
+        local raw = copy(GOOD)
+        raw.usage = {}
+        local card, reason = Gemini.normalize(raw)
+        assert_eq(card, nil)
+        assert_eq(reason, "missing usage")
+        raw = copy(GOOD)
+        raw.picture_format = "comic"
+        assert_eq(Gemini.normalize(raw).picture_format, "object")
     end)
 end)
 
