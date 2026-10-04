@@ -8,42 +8,38 @@ local function names_failed(list)
     return failed
 end
 
-local GOOD_FIELDS = {
-    Headword = "call off", Definition = "to decide that a planned event will not happen",
-    Example = "They <b>called off</b> the game because of rain.", Spanish = "cancelar / suspender",
-    Warning = "", PronTip = "", IPA = "/ˌkɔl ˈɔf/", Cloze = "They c____ ____ the game because of rain.",
-}
+local function good_card()
+    return {
+        headword = "call off", definition = "to decide that a planned event will not happen",
+        spanish = { "cancelar", "suspender" }, warning = "", ipa = "/ˌkɔl ˈɔf/",
+        usage = { { pattern = "call off + something", example = "They <b>called off</b> the game." },
+                  { pattern = "call something off", example = "We <b>called</b> the party <b>off</b>." } },
+        picture_format = "before_after", picture_scene = "Two panels: a sunny football game, then rain and an empty field.",
+        picture_caption = "They <b>called off</b> the game.",
+    }
+end
 
 describe("Checks.run", function()
     it("passes a good card", function()
         local case = { word = "called", sentence = "We ⟦called⟧ the meeting off and went home.",
                        expect = { headword = "call off", trap = "none" } }
-        assert_same(names_failed(Checks.run(case, { ok = true }, GOOD_FIELDS)), {})
+        assert_same(names_failed(Checks.run(case, { ok = true, card = good_card() })), {})
     end)
-    it("flags the headword in the definition, a copied example and duplicate Spanish", function()
-        local fields = {}
-        for k, v in pairs(GOOD_FIELDS) do fields[k] = v end
-        fields.Definition = "to call something off"
-        fields.Example = "We <b>called</b> the meeting off and went home."
-        fields.Spanish = "renuente / renuente a"
-        local case = { word = "called", sentence = "We ⟦called⟧ the meeting off and went home.", expect = {} }
-        assert_same(names_failed(Checks.run(case, { ok = true }, fields)),
-            { "definition_no_headword", "example_new", "spanish_clean" })
+    it("flags copied examples, few patterns, book names and long captions", function()
+        local card = good_card()
+        card.usage = { { pattern = "x", example = "Vin <b>called</b> the meeting off at home." } }
+        card.picture_caption = "One two three four five six seven eight nine ten eleven <b>x</b>"
+        card.picture_scene = "Vin in a dark alley."
+        local case = { word = "called", sentence = "Then Vin ⟦called⟧ the meeting off at home.", expect = {} }
+        assert_same(names_failed(Checks.run(case, { ok = true, card = card })),
+            { "usage_count", "example_new", "no_book_names", "caption_short" })
     end)
     it("expects a warning for a false friend and none otherwise", function()
         local case = { word = "realized", sentence = "", expect = { trap = "false_friend" } }
-        assert_same(names_failed(Checks.run(case, { ok = true }, GOOD_FIELDS)), { "warning_false_friend" })
+        assert_same(names_failed(Checks.run(case, { ok = true, card = good_card() })), { "warning_false_friend" })
     end)
     it("checks the status of names", function()
         local case = { word = "Vin", sentence = "", expect = { status = "proper_noun" } }
         assert_same(names_failed(Checks.run(case, { ok = false, kind = "not_a_word", status = "proper_noun" })), {})
-    end)
-    it("flags spelling talk and IPA that doesn't match the words", function()
-        local fields = {}
-        for k, v in pairs(GOOD_FIELDS) do fields[k] = v end
-        fields.PronTip = "Cuidado con la doble t."
-        fields.IPA = "/opak/"
-        local case = { word = "called", sentence = "", expect = {} }
-        assert_same(names_failed(Checks.run(case, { ok = true }, fields)), { "pron_tip_no_spelling", "ipa_words" })
     end)
 end)

@@ -33,17 +33,15 @@ for _, model in ipairs(models) do
         local started = os.time()
         local result = Gemini.generate(cfg, input, Curl.transport)
         seconds = seconds + (os.time() - started)
-        local fields
         out:write("## ", case.name, "\n\n")
         if result.ok then
-            local card = Pipeline.finish(result.card, input, "lexicard.koplugin/data/cmudict-ipa.tsv")
-            fields = Note.fields(card, input)
-            out:write("```\n", Note.preview_text(card, input, cfg.anki_deck), "\n```\n\n")
+            result.card = Pipeline.finish(result.card, input, "lexicard.koplugin/data/cmudict-ipa.tsv")
+            out:write("```\n", Note.preview_text(result.card, input, cfg.anki_deck, true), "\n```\n\n")
         else
             out:write("FAILED: ", tostring(result.kind), " ", tostring(result.status or result.message), "\n\n")
         end
         local failed = {}
-        for _, check in ipairs(Checks.run(case, result, fields)) do
+        for _, check in ipairs(Checks.run(case, result)) do
             total = total + 1
             per_check[check.name] = per_check[check.name] or { passed = 0, total = 0 }
             per_check[check.name].total = per_check[check.name].total + 1
